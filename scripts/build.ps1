@@ -1,4 +1,13 @@
-. (Join-Path -Path $PSScriptRoot -ChildPath 'commons.ps1')
+[CmdletBinding()]
+param (
+)
+
+$script:PSDefaultParameterValues = @{
+    '*:Confirm'           = $false
+    '*:ErrorAction'       = 'Stop'
+}
+
+. (Join-Path -Path $PSScriptRoot -ChildPath 'commons.ps1' -Resolve)
 
 function clean() {
     Write-Host "Cleaning $BUILD_DIR"
@@ -9,8 +18,8 @@ function clean() {
 }
 
 function compile() {
-    $NAME=Get-Content -Raw -Path $PROVIDER_NAME_FILE
-    $VERSION=Get-Content -Raw -Path $PROVIDER_VERSION_FILE
+    $NAME = Get-Content -Raw -Path $PROVIDER_NAME_FILE
+    $VERSION = Get-Content -Raw -Path $PROVIDER_VERSION_FILE
 
     $BUILD_ARTIFACT="terraform-provider-${NAME}_v${VERSION}"
 
@@ -18,7 +27,13 @@ function compile() {
     Push-Location -Path $SOURCE_DIR
     try {
         go mod download 
+        if ($LASTEXITCODE) {
+            throw "Failed to download modules"
+        }
         go build -o "$BUILD_DIR/$BUILD_ARTIFACT"
+        if ($LASTEXITCODE) {
+            throw "Build failed"
+        }
     }
     finally {
         Pop-Location
@@ -27,8 +42,8 @@ function compile() {
 
 function clean_and_build() {
     clean
-    #$(dirname $0)/unittest.sh
     compile
+    & (Join-Path -Path $PSScriptRoot -ChildPath 'unittest.ps1' -Resolve)
     Write-Host "Build finished successfully"
 }
 

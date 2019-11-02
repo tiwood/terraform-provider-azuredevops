@@ -1,3 +1,7 @@
+[CmdletBinding()]
+param (
+)
+
 $SCRIPTS_DIR=$PSScriptRoot
 $BUILD_DIR=[IO.Path]::GetFullPath([IO.Path]::Combine($SCRIPTS_DIR, '..', 'bin'))
 $SOURCE_DIR=[IO.Path]::GetFullPath([IO.Path]::Combine($SCRIPTS_DIR, '..'))
