@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/core"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/operations"
 )
 
@@ -323,4 +324,19 @@ func lookupProcessTemplateName(clients *aggregatedClient, templateID string) (st
 	}
 
 	return *process.Name, nil
+}
+
+// used by the two data sources - Group and Repos
+func getProjectDescriptor(clients *aggregatedClient, projectID string) (string, error) {
+	projectUUID, err := uuid.Parse(projectID)
+	if err != nil {
+		return "", err
+	}
+
+	descriptor, err := clients.GraphClient.GetDescriptor(clients.ctx, graph.GetDescriptorArgs{StorageKey: &projectUUID})
+	if err != nil {
+		return "", err
+	}
+
+	return *descriptor.Value, nil
 }

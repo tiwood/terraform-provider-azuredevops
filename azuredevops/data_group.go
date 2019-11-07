@@ -2,7 +2,7 @@ package azuredevops
 
 import (
 	"fmt"
-	"github.com/google/uuid"
+
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
@@ -59,20 +59,6 @@ func dataSourceGroupRead(d *schema.ResourceData, m interface{}) error {
 	d.SetId(*targetGroup.Descriptor)
 	d.Set("descriptor", *targetGroup.Descriptor)
 	return nil
-}
-
-func getProjectDescriptor(clients *aggregatedClient, projectID string) (string, error) {
-	projectUUID, err := uuid.Parse(projectID)
-	if err != nil {
-		return "", err
-	}
-
-	descriptor, err := clients.GraphClient.GetDescriptor(clients.ctx, graph.GetDescriptorArgs{StorageKey: &projectUUID})
-	if err != nil {
-		return "", err
-	}
-
-	return *descriptor.Value, nil
 }
 
 func getGroupsForDescriptor(clients *aggregatedClient, projectDescriptor string) (*[]graph.GraphGroup, error) {
