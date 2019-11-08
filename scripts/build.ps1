@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param (
+    [switch]
+    $SkipTests
 )
 
 $script:PSDefaultParameterValues = @{
@@ -43,7 +45,9 @@ function compile() {
 function clean_and_build() {
     clean
     compile
-    & (Join-Path -Path $PSScriptRoot -ChildPath 'unittest.ps1' -Resolve)
+    if (-not $SkipTests) {
+        & (Join-Path -Path $PSScriptRoot -ChildPath 'unittest.ps1' -Resolve)
+    }
     Write-Host "Build finished successfully"
 }
 
