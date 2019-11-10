@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
 )
 
 func dataUser() *schema.Resource {
@@ -65,7 +66,7 @@ func dataUser() *schema.Resource {
 }
 
 func dataUserRead(d *schema.ResourceData, m interface{}) error {
-	clients := m.(*aggregatedClient)
+	clients := m.(*config.AggregatedClient)
 	users := make([]map[string]interface{}, 0)
 
 	principalName := d.Get("principal_name").(string)
@@ -82,7 +83,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 			ContinuationToken: &continuationToken,
 		}
 
-		resp, err := clients.GraphClient.ListUsers(clients.ctx, listArgs)
+		resp, err := clients.GraphClient.ListUsers(clients.Ctx, listArgs)
 		if err != nil {
 			return fmt.Errorf("Error listing users: %q", err)
 		}
