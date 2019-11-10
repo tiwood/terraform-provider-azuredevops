@@ -28,7 +28,7 @@ function compile() {
     Write-Host "Attempting to build $BUILD_ARTIFACT"
     Push-Location -Path $SOURCE_DIR
     try {
-        go mod download 
+        go mod download
         if ($LASTEXITCODE) {
             throw "Failed to download modules"
         }
