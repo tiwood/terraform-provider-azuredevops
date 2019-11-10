@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param (
     [switch]
-    $SkipTests
+    $SkipTests,
+
+    [switch]
+    $Install
 )
 
 $script:PSDefaultParameterValues = @{
@@ -51,6 +54,9 @@ function clean_and_build() {
         & (Join-Path -Path $PSScriptRoot -ChildPath 'unittest.ps1' -Resolve)
     }
     Write-Host "Build finished successfully"
+    if ($Install) {
+        & (Join-Path -Path $PSScriptRoot -ChildPath 'local-install.ps1' -Resolve)
+    }
 }
 
 clean_and_build
