@@ -24,7 +24,9 @@ function compile() {
     $VERSION = Get-Content -Raw -Path $PROVIDER_VERSION_FILE
 
     $BUILD_ARTIFACT="terraform-provider-${NAME}_v${VERSION}"
-
+    if ($env:OS -like '*Windows*') {
+        $BUILD_ARTIFACT += '.exe'
+    }
     Write-Host "Attempting to build $BUILD_ARTIFACT"
     Push-Location -Path $SOURCE_DIR
     try {
