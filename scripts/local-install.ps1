@@ -2,7 +2,7 @@
 param (
     [Parameter()]
     [string]
-    $PluginsDirectory = [IO.Path]::Combine($HOME, '.terraform.d', 'plugins')
+    $PluginsDirectory
 )
 
 $script:PSDefaultParameterValues = @{
@@ -11,6 +11,17 @@ $script:PSDefaultParameterValues = @{
 }
 
 . (Join-Path -Path $PSScriptRoot -ChildPath 'commons.ps1' -Resolve)
+
+if (-not $PluginsDirectory) {
+    # https://www.terraform.io/docs/plugins/basics.html
+    # https://www.terraform.io/docs/extend/how-terraform-works.html#discovery
+    if ($env:OS -like '*Windows*') {
+        $PluginsDirectory = [System.IO.Path]::Combine($env:APPDATA, 'terraform.d', 'plugins')
+    }
+    else {
+        $PluginsDirectory = [Syetem.IO.Path]::Combine($HOME, '.terraform.d', 'plugins')
+    }
+}
 
 if (Test-Path -Path $PluginsDirectory) {
     Write-Verbose -Message "Terraform Plugins directory [$PluginsDirectory] already exists"
