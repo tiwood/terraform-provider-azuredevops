@@ -3,11 +3,13 @@ package azuredevops
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
 
 	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/webapi"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
 )
 
@@ -30,7 +32,7 @@ func resourceAzureGroup() *schema.Resource {
 			// One of
 			//     origin_id => GraphGroupOriginIdCreationContext
 			//     mail => GraphGroupMailAddressCreationContext
-			//     displayName => GraphGroupVstsCreationContext
+			//     display_name => GraphGroupVstsCreationContext
 			// must be specified
 			// ***
 
@@ -38,8 +40,9 @@ func resourceAzureGroup() *schema.Resource {
 				Type:          schema.TypeString,
 				ValidateFunc:  validation.NoZeroValues,
 				Optional:      true,
+				Computed:      true,
 				ForceNew:      true,
-				ConflictsWith: []string{"mail", "displayName"},
+				ConflictsWith: []string{"mail", "display_name"},
 			},
 
 			"mail": {
@@ -47,10 +50,11 @@ func resourceAzureGroup() *schema.Resource {
 				ValidateFunc:  validation.NoZeroValues,
 				Optional:      true,
 				ForceNew:      true,
-				ConflictsWith: []string{"origin_id", "displayName"},
+				Computed:      true,
+				ConflictsWith: []string{"origin_id", "display_name"},
 			},
 
-			"displayName": {
+			"display_name": {
 				Type:          schema.TypeString,
 				ValidateFunc:  validation.NoZeroValues,
 				Optional:      true,
@@ -106,13 +110,20 @@ func resourceAzureGroup() *schema.Resource {
 }
 
 func resourceAzureGroupCreate(d *schema.ResourceData, m interface{}) error {
-	clients := m.(*aggregatedClient)
+	clients := m.(*config.AggregatedClient)
 
 	// using: POST https://vssps.dev.azure.com/{organization}/_apis/graph/groups?api-version=5.1-preview.1
 	cga := graph.CreateGroupArgs{}
 	val, b := d.GetOk("scope")
 	if b {
-		cga.ScopeDescriptor = converter.String(val.(string))
+		uuid, _ := uuid.Parse(val.(string))
+		desc, err := clients.GraphClient.GetDescriptor(clients.Ctx, graph.GetDescriptorArgs{
+			StorageKey: &uuid,
+		})
+		if err != nil {
+			return err
+		}
+		cga.ScopeDescriptor = desc.Value
 	}
 	val, b = d.GetOk("origin_id")
 	if b {
@@ -126,7 +137,7 @@ func resourceAzureGroupCreate(d *schema.ResourceData, m interface{}) error {
 				MailAddress: converter.String(val.(string)),
 			}
 		} else {
-			val, b = d.GetOk("displayName")
+			val, b = d.GetOk("display_name")
 			if b {
 				cga.CreationContext = &graph.GraphGroupVstsCreationContext{
 					DisplayName: converter.String(val.(string)),
@@ -137,7 +148,7 @@ func resourceAzureGroupCreate(d *schema.ResourceData, m interface{}) error {
 			}
 		}
 	}
-	group, err := clients.GraphClient.CreateGroup(clients.ctx, cga)
+	group, err := clients.GraphClient.CreateGroup(clients.Ctx, cga)
 	if err != nil {
 		return err
 	}
@@ -145,14 +156,14 @@ func resourceAzureGroupCreate(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceAzureGroupRead(d *schema.ResourceData, m interface{}) error {
-	clients := m.(*aggregatedClient)
+	clients := m.(*config.AggregatedClient)
 
 	// using: GET https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
 	// d.Get("descriptor").(string) => {groupDescriptor}
 	getGroupArgs := graph.GetGroupArgs{
 		GroupDescriptor: converter.String(d.Get("descriptor").(string)),
 	}
-	group, err := clients.GraphClient.GetGroup(clients.ctx, getGroupArgs)
+	group, err := clients.GraphClient.GetGroup(clients.Ctx, getGroupArgs)
 	if err != nil {
 		return err
 	}
@@ -160,7 +171,7 @@ func resourceAzureGroupRead(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceAzureGroupUpdate(d *schema.ResourceData, m interface{}) error {
-	clients := m.(*aggregatedClient)
+	clients := m.(*config.AggregatedClient)
 
 	// using: PATCH https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
 	// d.Get("descriptor").(string) => {groupDescriptor}
@@ -182,7 +193,7 @@ func resourceAzureGroupUpdate(d *schema.ResourceData, m interface{}) error {
 			},
 		},
 	}
-	group, err = clients.GraphClient.UpdateGroup(clients.ctx, uptGroupArgs)
+	group, err = clients.GraphClient.UpdateGroup(clients.Ctx, uptGroupArgs)
 	if err != nil {
 		return err
 	}
@@ -190,14 +201,14 @@ func resourceAzureGroupUpdate(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceAzureGroupDelete(d *schema.ResourceData, m interface{}) error {
-	clients := m.(*aggregatedClient)
+	clients := m.(*config.AggregatedClient)
 
 	// using: DELETE https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
 	// d.Get("descriptor").(string) => {groupDescriptor}
 	delGroupArgs := graph.DeleteGroupArgs{
 		GroupDescriptor: converter.String(d.Get("descriptor").(string)),
 	}
-	return clients.GraphClient.DeleteGroup(clients.ctx, delGroupArgs)
+	return clients.GraphClient.DeleteGroup(clients.Ctx, delGroupArgs)
 }
 
 // Convert internal Terraform data structure to an AzDO data structure
@@ -205,7 +216,7 @@ func expandGroup(d *schema.ResourceData) (*graph.GraphGroup, error) {
 
 	group := &graph.GraphGroup{
 		Descriptor:    converter.String(d.Get("descriptor").(string)),
-		DisplayName:   converter.String(d.Get("displayName").(string)),
+		DisplayName:   converter.String(d.Get("display_name").(string)),
 		Url:           converter.String(d.Get("url").(string)),
 		Origin:        converter.String(d.Get("origin").(string)),
 		OriginId:      converter.String(d.Get("origin_id").(string)),
@@ -223,15 +234,19 @@ func flattenGroup(d *schema.ResourceData, group *graph.GraphGroup) error {
 
 	d.SetId(*group.Descriptor)
 	d.Set("descriptor", *group.Descriptor)
-	d.Set("displayName", *group.DisplayName)
+	d.Set("display_name", *group.DisplayName)
 	d.Set("url", *group.Url)
 	d.Set("origin", *group.Origin)
 	d.Set("origin_id", *group.OriginId)
 	d.Set("subject_kind", *group.SubjectKind)
 	d.Set("domain", *group.Domain)
-	d.Set("mail", *group.MailAddress)
+	if group.MailAddress != nil {
+		d.Set("mail", *group.MailAddress)
+	}
 	d.Set("principal_name", *group.PrincipalName)
-	d.Set("description", *group.Description)
+	if group.Description != nil {
+		d.Set("description", *group.Description)
+	}
 
 	return nil
 }
