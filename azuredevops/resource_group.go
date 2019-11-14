@@ -59,6 +59,7 @@ func resourceAzureGroup() *schema.Resource {
 				ValidateFunc:  validation.NoZeroValues,
 				Optional:      true,
 				ForceNew:      true,
+				Computed:      true,
 				ConflictsWith: []string{"origin_id", "mail"},
 			},
 
