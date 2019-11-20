@@ -13,12 +13,12 @@ import (
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
 )
 
-func resourceAzureGroup() *schema.Resource {
+func resourceGroup() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceAzureGroupCreate,
-		Read:   resourceAzureGroupRead,
-		Update: resourceAzureGroupUpdate,
-		Delete: resourceAzureGroupDelete,
+		Create: resourceGroupCreate,
+		Read:   resourceGroupRead,
+		Update: resourceGroupUpdate,
+		Delete: resourceGroupDelete,
 
 		Schema: map[string]*schema.Schema{
 			"scope": {
@@ -110,7 +110,7 @@ func resourceAzureGroup() *schema.Resource {
 	}
 }
 
-func resourceAzureGroupCreate(d *schema.ResourceData, m interface{}) error {
+func resourceGroupCreate(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
 
 	// using: POST https://vssps.dev.azure.com/{organization}/_apis/graph/groups?api-version=5.1-preview.1
@@ -156,7 +156,7 @@ func resourceAzureGroupCreate(d *schema.ResourceData, m interface{}) error {
 	return flattenGroup(d, group)
 }
 
-func resourceAzureGroupRead(d *schema.ResourceData, m interface{}) error {
+func resourceGroupRead(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
 
 	// using: GET https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
@@ -171,7 +171,7 @@ func resourceAzureGroupRead(d *schema.ResourceData, m interface{}) error {
 	return flattenGroup(d, group)
 }
 
-func resourceAzureGroupUpdate(d *schema.ResourceData, m interface{}) error {
+func resourceGroupUpdate(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
 
 	// using: PATCH https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
@@ -201,7 +201,7 @@ func resourceAzureGroupUpdate(d *schema.ResourceData, m interface{}) error {
 	return flattenGroup(d, group)
 }
 
-func resourceAzureGroupDelete(d *schema.ResourceData, m interface{}) error {
+func resourceGroupDelete(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
 
 	// using: DELETE https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
@@ -233,18 +233,36 @@ func expandGroup(d *schema.ResourceData) (*graph.GraphGroup, error) {
 
 func flattenGroup(d *schema.ResourceData, group *graph.GraphGroup) error {
 
-	d.SetId(*group.Descriptor)
-	d.Set("descriptor", *group.Descriptor)
-	d.Set("display_name", *group.DisplayName)
-	d.Set("url", *group.Url)
-	d.Set("origin", *group.Origin)
-	d.Set("origin_id", *group.OriginId)
-	d.Set("subject_kind", *group.SubjectKind)
-	d.Set("domain", *group.Domain)
+	if group.Descriptor != nil {
+		d.Set("descriptor", *group.Descriptor)
+		d.SetId(*group.Descriptor)
+	} else {
+		return fmt.Errorf("Group Object does not contain a descriptor")
+	}
+	if group.DisplayName != nil {
+		d.Set("display_name", *group.DisplayName)
+	}
+	if group.Url != nil {
+		d.Set("url", *group.Url)
+	}
+	if group.Origin != nil {
+		d.Set("origin", *group.Origin)
+	}
+	if group.OriginId != nil {
+		d.Set("origin_id", *group.OriginId)
+	}
+	if group.SubjectKind != nil {
+		d.Set("subject_kind", *group.SubjectKind)
+	}
+	if group.Domain != nil {
+		d.Set("domain", *group.Domain)
+	}
 	if group.MailAddress != nil {
 		d.Set("mail", *group.MailAddress)
 	}
-	d.Set("principal_name", *group.PrincipalName)
+	if group.PrincipalName != nil {
+		d.Set("principal_name", *group.PrincipalName)
+	}
 	if group.Description != nil {
 		d.Set("description", *group.Description)
 	}
