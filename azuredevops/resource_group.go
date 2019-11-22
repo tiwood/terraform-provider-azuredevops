@@ -105,6 +105,7 @@ func resourceGroup() *schema.Resource {
 					ValidateFunc: validation.NoZeroValues,
 				},
 				Optional: true,
+				Set:      schema.HashString,
 			},
 		},
 	}
@@ -153,7 +154,15 @@ func resourceGroupCreate(d *schema.ResourceData, m interface{}) error {
 	if err != nil {
 		return err
 	}
-	return flattenGroup(d, group)
+	if group.Descriptor == nil {
+		return fmt.Errorf("DevOps REST API returned group object without descriptor")
+	}
+
+	members := expandGroupMembers(*group.Descriptor, d.Get("members").(*schema.Set))
+	if err := addMembers(clients, members); err != nil {
+		return fmt.Errorf("Error adding group memberships during create: %+v", err)
+	}
+	return flattenGroup(d, group, members)
 }
 
 func resourceGroupRead(d *schema.ResourceData, m interface{}) error {
@@ -162,13 +171,20 @@ func resourceGroupRead(d *schema.ResourceData, m interface{}) error {
 	// using: GET https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
 	// d.Get("descriptor").(string) => {groupDescriptor}
 	getGroupArgs := graph.GetGroupArgs{
-		GroupDescriptor: converter.String(d.Get("descriptor").(string)),
+		GroupDescriptor: converter.String(d.Id()),
 	}
 	group, err := clients.GraphClient.GetGroup(clients.Ctx, getGroupArgs)
 	if err != nil {
 		return err
 	}
-	return flattenGroup(d, group)
+	if group.Descriptor == nil {
+		return fmt.Errorf("DevOps REST API returned group object without descriptor; group %s", d.Id())
+	}
+	members, err := groupReadMembers(*group.Descriptor, clients)
+	if err != nil {
+		return err
+	}
+	return flattenGroup(d, group, members)
 }
 
 func resourceGroupUpdate(d *schema.ResourceData, m interface{}) error {
@@ -177,28 +193,45 @@ func resourceGroupUpdate(d *schema.ResourceData, m interface{}) error {
 	// using: PATCH https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
 	// d.Get("descriptor").(string) => {groupDescriptor}
 
-	group, err := expandGroup(d)
+	group, members, err := expandGroup(d)
 	if err != nil {
 		return err
 	}
-	// as specified in the schema, the only updatable attribute is the description
 
-	uptGroupArgs := graph.UpdateGroupArgs{
-		GroupDescriptor: converter.String(d.Get("descriptor").(string)),
-		PatchDocument: &[]webapi.JsonPatchOperation{
-			{
-				Op:    &webapi.OperationValues.Replace,
-				From:  nil,
-				Path:  converter.String("/description"),
-				Value: group.Description,
+	if d.HasChange("description") {
+		// FIXME: does not clear the description if empty! Error: value cannot be nil
+		uptGroupArgs := graph.UpdateGroupArgs{
+			GroupDescriptor: converter.String(d.Id()),
+			PatchDocument: &[]webapi.JsonPatchOperation{
+				{
+					Op:    &webapi.OperationValues.Replace,
+					From:  nil,
+					Path:  converter.String("/description"),
+					Value: group.Description,
+				},
 			},
-		},
+		}
+		group, err = clients.GraphClient.UpdateGroup(clients.Ctx, uptGroupArgs)
+		if err != nil {
+			return err
+		}
 	}
-	group, err = clients.GraphClient.UpdateGroup(clients.Ctx, uptGroupArgs)
-	if err != nil {
-		return err
+	if d.HasChange("members") {
+		// FIXME: implement strategy to update memebrs like in azuredevops\resource_group_membership.go
+		// Delete all members
+		currentMembers, err := groupReadMembers(*group.Descriptor, clients)
+		if err != nil {
+			return err
+		}
+		if err := removeMembers(clients, currentMembers); err != nil {
+			return err
+		}
+		// add all members from state
+		if err := addMembers(clients, members); err != nil {
+			return fmt.Errorf("Error adding group memberships during update: %+v", err)
+		}
 	}
-	return flattenGroup(d, group)
+	return flattenGroup(d, group, members)
 }
 
 func resourceGroupDelete(d *schema.ResourceData, m interface{}) error {
@@ -207,16 +240,16 @@ func resourceGroupDelete(d *schema.ResourceData, m interface{}) error {
 	// using: DELETE https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
 	// d.Get("descriptor").(string) => {groupDescriptor}
 	delGroupArgs := graph.DeleteGroupArgs{
-		GroupDescriptor: converter.String(d.Get("descriptor").(string)),
+		GroupDescriptor: converter.String(d.Id()),
 	}
 	return clients.GraphClient.DeleteGroup(clients.Ctx, delGroupArgs)
 }
 
 // Convert internal Terraform data structure to an AzDO data structure
-func expandGroup(d *schema.ResourceData) (*graph.GraphGroup, error) {
+func expandGroup(d *schema.ResourceData) (*graph.GraphGroup, *[]graph.GraphMembership, error) {
 
-	group := &graph.GraphGroup{
-		Descriptor:    converter.String(d.Get("descriptor").(string)),
+	group := graph.GraphGroup{
+		Descriptor:    converter.String(d.Id()),
 		DisplayName:   converter.String(d.Get("display_name").(string)),
 		Url:           converter.String(d.Get("url").(string)),
 		Origin:        converter.String(d.Get("origin").(string)),
@@ -228,10 +261,19 @@ func expandGroup(d *schema.ResourceData) (*graph.GraphGroup, error) {
 		Description:   converter.String(d.Get("description").(string)),
 	}
 
-	return group, nil
+	dMembers := d.Get("members").(*schema.Set).List()
+
+	members := make([]graph.GraphMembership, 0)
+	for _, e := range dMembers {
+		members = append(members, graph.GraphMembership{
+			ContainerDescriptor: group.Descriptor,
+			MemberDescriptor:    converter.String(e.(string)),
+		})
+	}
+	return &group, &members, nil
 }
 
-func flattenGroup(d *schema.ResourceData, group *graph.GraphGroup) error {
+func flattenGroup(d *schema.ResourceData, group *graph.GraphGroup, members *[]graph.GraphMembership) error {
 
 	if group.Descriptor != nil {
 		d.Set("descriptor", *group.Descriptor)
@@ -266,6 +308,30 @@ func flattenGroup(d *schema.ResourceData, group *graph.GraphGroup) error {
 	if group.Description != nil {
 		d.Set("description", *group.Description)
 	}
-
+	if members != nil {
+		dMembers := make([]string, 0)
+		for _, e := range *members {
+			dMembers = append(dMembers, *e.MemberDescriptor)
+		}
+		d.Set("members", dMembers)
+	}
 	return nil
+}
+
+func groupReadMembers(groupDescriptor string, clients *config.AggregatedClient) (*[]graph.GraphMembership, error) {
+	actualMembers, err := clients.GraphClient.ListMemberships(clients.Ctx, graph.ListMembershipsArgs{
+		SubjectDescriptor: &groupDescriptor,
+		Direction:         &graph.GraphTraversalDirectionValues.Down,
+		Depth:             converter.Int(1),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Error reading group memberships during read: %+v", err)
+	}
+
+	members := make([]graph.GraphMembership, len(*actualMembers))
+	for i, membership := range *actualMembers {
+		members[i] = *buildMembership(groupDescriptor, *membership.MemberDescriptor)
+	}
+
+	return &members, nil
 }
