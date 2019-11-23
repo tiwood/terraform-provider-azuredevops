@@ -24,61 +24,6 @@ import (
  * Begin unit tests
  */
 
-func TestGroupMembership_ComputeMembershipDiff_ResolvesDiffProperly(t *testing.T) {
-	// If you are curious about the use of map here, have a read through this article:
-	//	https://stackoverflow.com/questions/34018908/golang-why-dont-we-have-a-set-datastructure
-	type membershipsTestMeta struct {
-		old      map[string]bool
-		new      map[string]bool
-		toAdd    map[string]bool
-		toRemove map[string]bool
-	}
-	// table of tests for computing membership diffs
-	tests := []membershipsTestMeta{{
-		// add single member
-		old:      toStringSet("A"),
-		new:      toStringSet("A", "B"),
-		toAdd:    toStringSet("B"),
-		toRemove: toStringSet(),
-	}, {
-		// remove single member
-		old:      toStringSet("A", "B"),
-		new:      toStringSet("A"),
-		toAdd:    toStringSet(),
-		toRemove: toStringSet("B"),
-	}, {
-		// add and remove members
-		old:      toStringSet("A", "B", "C", "D"),
-		new:      toStringSet("A", "B", "E", "F"),
-		toAdd:    toStringSet("E", "F"),
-		toRemove: toStringSet("C", "D"),
-	}, {
-		// no change to members
-		old:      toStringSet("A"),
-		new:      toStringSet("A"),
-		toAdd:    toStringSet(),
-		toRemove: toStringSet(),
-	}}
-
-	for _, test := range tests {
-		toAdd, toRemove := computeMembershipDiff("", test.old, test.new)
-		require.Equal(t, len(test.toAdd), len(*toAdd))
-		require.Equal(t, len(test.toRemove), len(*toRemove))
-
-		for _, membership := range *toAdd {
-			if _, exists := test.toAdd[*membership.MemberDescriptor]; !exists {
-				require.Fail(t, fmt.Sprintf("%s was unexpectedly not in the list of membershps to add!", *membership.MemberDescriptor))
-			}
-		}
-
-		for _, membership := range *toRemove {
-			if _, exists := test.toRemove[*membership.MemberDescriptor]; !exists {
-				require.Fail(t, fmt.Sprintf("%s was unexpectedly not in the list of membershps to remove!", *membership.MemberDescriptor))
-			}
-		}
-	}
-}
-
 func getGroupMembershipResourceData(t *testing.T, group string, members ...string) *schema.ResourceData {
 	d := schema.TestResourceDataRaw(t, resourceGroupMembership().Schema, nil)
 	d.Set("group", group)

@@ -59,9 +59,14 @@ func resourceGroupMembershipUpdate(d *schema.ResourceData, m interface{}) error 
 	}
 
 	group := d.Get("group").(string)
-	oldMembers, newMembers := getOldAndNewMemberSetsFromResourceData(d)
-	toAdd, toRemove := computeMembershipDiff(group, oldMembers, newMembers)
-	return applyMembershipUpdate(m.(*config.AggregatedClient), toAdd, toRemove)
+	oldData, newData := d.GetChange("members")
+	// members that need to be added will be missing from the old data, but present in the new data
+	membersToAdd := newData.(*schema.Set).Difference(oldData.(*schema.Set))
+	// members that need to be removed will be missing from the new data, but present in the old data
+	membersToRemove := oldData.(*schema.Set).Difference(newData.(*schema.Set))
+	return applyMembershipUpdate(m.(*config.AggregatedClient),
+		expandGroupMembers(group, membersToAdd),
+		expandGroupMembers(group, membersToRemove))
 }
 
 func applyMembershipUpdate(clients *config.AggregatedClient, toAdd *[]graph.GraphMembership, toRemove *[]graph.GraphMembership) error {
@@ -76,50 +81,6 @@ func applyMembershipUpdate(clients *config.AggregatedClient, toAdd *[]graph.Grap
 	}
 
 	return nil
-}
-
-// Computes the memberships to add and remove. This should only be called during an Update operation
-//	The first element returned are memberships to add
-// 	The second element returned are memberships to remove
-func computeMembershipDiff(group string, oldMembers map[string]bool, newMembers map[string]bool) (*[]graph.GraphMembership, *[]graph.GraphMembership) {
-	membersToAdd, membersToRemove := []graph.GraphMembership{}, []graph.GraphMembership{}
-
-	// members that need to be added will be missing from the old data, but present in the new data
-	for member := range newMembers {
-		if _, exists := oldMembers[member]; !exists {
-			membersToAdd = append(membersToAdd, *buildMembership(group, member))
-		}
-	}
-
-	// members that need to be removed will be missing from the new data, but present in the old data
-	for member := range oldMembers {
-		if _, exists := newMembers[member]; !exists {
-			membersToRemove = append(membersToRemove, *buildMembership(group, member))
-		}
-	}
-
-	return &membersToAdd, &membersToRemove
-}
-
-// Pull the "old" and "new" membership information from the state and convert them into string sets.
-//
-// If you are curious about the return type, have a read through this article:
-//	https://stackoverflow.com/questions/34018908/golang-why-dont-we-have-a-set-datastructure
-func getOldAndNewMemberSetsFromResourceData(d *schema.ResourceData) (map[string]bool, map[string]bool) {
-	oldData, newData := d.GetChange("members")
-	oldMembers := toStringSet(oldData.([]interface{}))
-	newMembers := toStringSet(newData.([]interface{}))
-	return oldMembers, newMembers
-}
-
-// Convert a list of elements into a set of strings
-func toStringSet(items ...interface{}) map[string]bool {
-	theSet := map[string]bool{}
-	for _, item := range items {
-		theSet[item.(string)] = true
-	}
-
-	return theSet
 }
 
 func resourceGroupMembershipDelete(d *schema.ResourceData, m interface{}) error {
@@ -138,40 +99,45 @@ func resourceGroupMembershipDelete(d *schema.ResourceData, m interface{}) error 
 
 // Add members to a group using the AzDO REST API. If any error is encountered, the function immediately returns.
 func addMembers(clients *config.AggregatedClient, memberships *[]graph.GraphMembership) error {
-	for _, membership := range *memberships {
-		_, err := clients.GraphClient.AddMembership(clients.Ctx, graph.AddMembershipArgs{
-			SubjectDescriptor:   membership.MemberDescriptor,
-			ContainerDescriptor: membership.ContainerDescriptor,
-		})
+	if memberships != nil {
+		for _, membership := range *memberships {
+			_, err := clients.GraphClient.AddMembership(clients.Ctx, graph.AddMembershipArgs{
+				SubjectDescriptor:   membership.MemberDescriptor,
+				ContainerDescriptor: membership.ContainerDescriptor,
+			})
 
-		if err != nil {
-			return fmt.Errorf("Error adding member %s to group %s: %+v",
-				converter.ToString(membership.MemberDescriptor, "nil"),
-				converter.ToString(membership.ContainerDescriptor, "nil"),
-				err)
+			if err != nil {
+				return fmt.Errorf("Error adding member %s to group %s: %+v",
+					converter.ToString(membership.MemberDescriptor, "nil"),
+					converter.ToString(membership.ContainerDescriptor, "nil"),
+					err)
+			}
 		}
 	}
-
 	return nil
 }
 
 // Remove members from a group using the AzDO REST API. If any error is encountered, the function immediately returns.
 func removeMembers(clients *config.AggregatedClient, memberships *[]graph.GraphMembership) error {
-	for _, membership := range *memberships {
-		err := clients.GraphClient.RemoveMembership(clients.Ctx, graph.RemoveMembershipArgs{
-			SubjectDescriptor:   membership.MemberDescriptor,
-			ContainerDescriptor: membership.ContainerDescriptor,
-		})
+	if memberships != nil {
+		for _, membership := range *memberships {
+			err := clients.GraphClient.RemoveMembership(clients.Ctx, graph.RemoveMembershipArgs{
+				SubjectDescriptor:   membership.MemberDescriptor,
+				ContainerDescriptor: membership.ContainerDescriptor,
+			})
 
-		if err != nil {
-			return fmt.Errorf("Error removing member from group: %+v", err)
+			if err != nil {
+				return fmt.Errorf("Error removing member from group: %+v", err)
+			}
 		}
 	}
-
 	return nil
 }
 
 func expandGroupMembers(group string, memberSet *schema.Set) *[]graph.GraphMembership {
+	if memberSet == nil || memberSet.Len() <= 0 {
+		return &[]graph.GraphMembership{}
+	}
 	members := memberSet.List()
 	memberships := make([]graph.GraphMembership, len(members))
 
@@ -202,9 +168,12 @@ func resourceGroupMembershipRead(d *schema.ResourceData, m interface{}) error {
 		return fmt.Errorf("Error reading group memberships during read: %+v", err)
 	}
 
-	members := make([]string, len(*actualMemberships))
-	for i, membership := range *actualMemberships {
-		members[i] = *membership.MemberDescriptor
+	stateMembers := d.Get("members").(*schema.Set)
+	members := make([]string, 0)
+	for _, membership := range *actualMemberships {
+		if stateMembers.Contains(*membership.MemberDescriptor) {
+			members = append(members, *membership.MemberDescriptor)
+		}
 	}
 
 	d.Set("members", members)
