@@ -50,7 +50,7 @@ func resourceGroupMembershipCreate(d *schema.ResourceData, m interface{}) error 
 
 	// The ID for this resource is meaningless so we can just assign a random ID
 	d.SetId(fmt.Sprintf("%d", rand.Int()))
-	return nil
+	return resourceGroupMembershipRead(d, m)
 }
 
 func resourceGroupMembershipUpdate(d *schema.ResourceData, m interface{}) error {
@@ -64,9 +64,13 @@ func resourceGroupMembershipUpdate(d *schema.ResourceData, m interface{}) error 
 	membersToAdd := newData.(*schema.Set).Difference(oldData.(*schema.Set))
 	// members that need to be removed will be missing from the new data, but present in the old data
 	membersToRemove := oldData.(*schema.Set).Difference(newData.(*schema.Set))
-	return applyMembershipUpdate(m.(*config.AggregatedClient),
+	err := applyMembershipUpdate(m.(*config.AggregatedClient),
 		expandGroupMembers(group, membersToAdd),
 		expandGroupMembers(group, membersToRemove))
+	if err != nil {
+		return err
+	}
+	return resourceGroupMembershipRead(d, m)
 }
 
 func applyMembershipUpdate(clients *config.AggregatedClient, toAdd *[]graph.GraphMembership, toRemove *[]graph.GraphMembership) error {
