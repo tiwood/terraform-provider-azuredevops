@@ -104,8 +104,10 @@ func resourceGroup() *schema.Resource {
 					Type:         schema.TypeString,
 					ValidateFunc: validation.NoZeroValues,
 				},
-				Optional: true,
-				Set:      schema.HashString,
+				Computed:   true,
+				Optional:   true,
+				ConfigMode: schema.SchemaConfigModeAttr,
+				Set:        schema.HashString,
 			},
 		},
 	}
@@ -158,11 +160,17 @@ func resourceGroupCreate(d *schema.ResourceData, m interface{}) error {
 		return fmt.Errorf("DevOps REST API returned group object without descriptor")
 	}
 
-	members := expandGroupMembers(*group.Descriptor, d.Get("members").(*schema.Set))
-	if err := addMembers(clients, members); err != nil {
-		return fmt.Errorf("Error adding group memberships during create: %+v", err)
+	stateMembers, exists := d.GetOk("members")
+	if exists {
+		members := expandGroupMembers(*group.Descriptor, stateMembers.(*schema.Set))
+		if err := addMembers(clients, members); err != nil {
+			return fmt.Errorf("Error adding group memberships during create: %+v", err)
+		}
 	}
-	return flattenGroup(d, group, members)
+
+	d.SetId(*group.Descriptor)
+
+	return resourceGroupRead(d, m)
 }
 
 func resourceGroupRead(d *schema.ResourceData, m interface{}) error {
@@ -180,6 +188,7 @@ func resourceGroupRead(d *schema.ResourceData, m interface{}) error {
 	if group.Descriptor == nil {
 		return fmt.Errorf("DevOps REST API returned group object without descriptor; group %s", d.Id())
 	}
+
 	members, err := groupReadMembers(*group.Descriptor, clients)
 	if err != nil {
 		return err
@@ -193,13 +202,10 @@ func resourceGroupUpdate(d *schema.ResourceData, m interface{}) error {
 	// using: PATCH https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}?api-version=5.1-preview.1
 	// d.Get("descriptor").(string) => {groupDescriptor}
 
-	group, members, err := expandGroup(d)
-	if err != nil {
-		return err
-	}
+	d.Partial(true)
 
 	if d.HasChange("description") {
-		// FIXME: does not clear the description if empty! Error: value cannot be nil
+		description := d.Get("description")
 		uptGroupArgs := graph.UpdateGroupArgs{
 			GroupDescriptor: converter.String(d.Id()),
 			PatchDocument: &[]webapi.JsonPatchOperation{
@@ -207,31 +213,37 @@ func resourceGroupUpdate(d *schema.ResourceData, m interface{}) error {
 					Op:    &webapi.OperationValues.Replace,
 					From:  nil,
 					Path:  converter.String("/description"),
-					Value: group.Description,
+					Value: description.(string),
 				},
 			},
 		}
-		group, err = clients.GraphClient.UpdateGroup(clients.Ctx, uptGroupArgs)
+
+		_, err := clients.GraphClient.UpdateGroup(clients.Ctx, uptGroupArgs)
 		if err != nil {
 			return err
 		}
+
+		d.SetPartial("description")
 	}
+
 	if d.HasChange("members") {
-		// FIXME: implement strategy to update memebrs like in azuredevops\resource_group_membership.go
-		// Delete all members
-		currentMembers, err := groupReadMembers(*group.Descriptor, clients)
-		if err != nil {
+		group := d.Id()
+		oldData, newData := d.GetChange("members")
+		// members that need to be added will be missing from the old data, but present in the new data
+		membersToAdd := newData.(*schema.Set).Difference(oldData.(*schema.Set))
+		// members that need to be removed will be missing from the new data, but present in the old data
+		membersToRemove := oldData.(*schema.Set).Difference(newData.(*schema.Set))
+		if err := applyMembershipUpdate(m.(*config.AggregatedClient),
+			expandGroupMembers(group, membersToAdd),
+			expandGroupMembers(group, membersToRemove)); err != nil {
 			return err
 		}
-		if err := removeMembers(clients, currentMembers); err != nil {
-			return err
-		}
-		// add all members from state
-		if err := addMembers(clients, members); err != nil {
-			return fmt.Errorf("Error adding group memberships during update: %+v", err)
-		}
+
+		d.SetPartial("members")
 	}
-	return flattenGroup(d, group, members)
+
+	d.Partial(false)
+	return resourceGroupRead(d, m)
 }
 
 func resourceGroupDelete(d *schema.ResourceData, m interface{}) error {
@@ -242,7 +254,12 @@ func resourceGroupDelete(d *schema.ResourceData, m interface{}) error {
 	delGroupArgs := graph.DeleteGroupArgs{
 		GroupDescriptor: converter.String(d.Id()),
 	}
-	return clients.GraphClient.DeleteGroup(clients.Ctx, delGroupArgs)
+	err := clients.GraphClient.DeleteGroup(clients.Ctx, delGroupArgs)
+	if err != nil {
+		return err
+	}
+	d.SetId("")
+	return nil
 }
 
 // Convert internal Terraform data structure to an AzDO data structure
@@ -261,14 +278,14 @@ func expandGroup(d *schema.ResourceData) (*graph.GraphGroup, *[]graph.GraphMembe
 		Description:   converter.String(d.Get("description").(string)),
 	}
 
-	dMembers := d.Get("members").(*schema.Set).List()
-
-	members := make([]graph.GraphMembership, 0)
-	for _, e := range dMembers {
-		members = append(members, graph.GraphMembership{
+	stateMembers := d.Get("members")
+	dMembers := stateMembers.(*schema.Set).List()
+	members := make([]graph.GraphMembership, len(dMembers))
+	for i, e := range dMembers {
+		members[i] = graph.GraphMembership{
 			ContainerDescriptor: group.Descriptor,
 			MemberDescriptor:    converter.String(e.(string)),
-		})
+		}
 	}
 	return &group, &members, nil
 }
@@ -309,9 +326,9 @@ func flattenGroup(d *schema.ResourceData, group *graph.GraphGroup, members *[]gr
 		d.Set("description", *group.Description)
 	}
 	if members != nil {
-		dMembers := make([]string, 0)
-		for _, e := range *members {
-			dMembers = append(dMembers, *e.MemberDescriptor)
+		dMembers := make([]string, len(*members))
+		for i, e := range *members {
+			dMembers[i] = *e.MemberDescriptor
 		}
 		d.Set("members", dMembers)
 	}
