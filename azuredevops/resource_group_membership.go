@@ -25,6 +25,14 @@ func resourceGroupMembership() *schema.Resource {
 				ForceNew:     true,
 				ValidateFunc: validation.NoZeroValues,
 			},
+			"mode": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "add",
+				ValidateFunc: validation.StringInSlice([]string{
+					"add", "overwrite",
+				}, true),
+			},
 			"members": {
 				Type: schema.TypeSet,
 				Elem: &schema.Schema{
@@ -41,9 +49,26 @@ func resourceGroupMembership() *schema.Resource {
 
 func resourceGroupMembershipCreate(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
-	memberships := expandGroupMembers(d.Get("group").(string), d.Get("members").(*schema.Set))
+	group := d.Get("group").(string)
+	mode := d.Get("mode").(string)
+	membersToAdd := d.Get("members").(*schema.Set)
+	var membersToRemove *schema.Set = nil
 
-	err := addMembers(clients, memberships)
+	if "overwrite" == mode {
+		actualMemberships, err := getGroupMemberships(clients, group)
+		if err != nil {
+			return fmt.Errorf("Error reading group memberships during read: %+v", err)
+		}
+		actualMembershipsSet, err := getGroupMembershipSet(actualMemberships)
+		if err != nil {
+			return fmt.Errorf("Error converting membership list to set: %+v", err)
+		}
+		membersToRemove = membersToAdd.Difference(actualMembershipsSet)
+	}
+
+	err := applyMembershipUpdate(m.(*config.AggregatedClient),
+		expandGroupMembers(group, membersToAdd),
+		expandGroupMembers(group, membersToRemove))
 	if err != nil {
 		return fmt.Errorf("Error adding group memberships during create: %+v", err)
 	}
@@ -163,23 +188,38 @@ func resourceGroupMembershipRead(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
 	group := d.Get("group").(string)
 
-	actualMemberships, err := clients.GraphClient.ListMemberships(clients.Ctx, graph.ListMembershipsArgs{
-		SubjectDescriptor: &group,
-		Direction:         &graph.GraphTraversalDirectionValues.Down,
-		Depth:             converter.Int(1),
-	})
+	actualMemberships, err := getGroupMemberships(clients, group)
 	if err != nil {
 		return fmt.Errorf("Error reading group memberships during read: %+v", err)
 	}
 
+	mode := d.Get("mode").(string)
 	stateMembers := d.Get("members").(*schema.Set)
 	members := make([]string, 0)
 	for _, membership := range *actualMemberships {
-		if stateMembers.Contains(*membership.MemberDescriptor) {
+		if "overwrite" == mode || stateMembers.Contains(*membership.MemberDescriptor) {
 			members = append(members, *membership.MemberDescriptor)
 		}
 	}
 
 	d.Set("members", members)
 	return nil
+}
+
+func getGroupMemberships(clients *config.AggregatedClient, groupDescriptor string) (*[]graph.GraphMembership, error) {
+	return clients.GraphClient.ListMemberships(clients.Ctx, graph.ListMembershipsArgs{
+		SubjectDescriptor: &groupDescriptor,
+		Direction:         &graph.GraphTraversalDirectionValues.Down,
+		Depth:             converter.Int(1),
+	})
+}
+
+func getGroupMembershipSet(members *[]graph.GraphMembership) (*schema.Set, error) {
+	set := schema.NewSet(schema.HashString, nil)
+	if nil != members {
+		for _, member := range *members {
+			set.Add(*member.MemberDescriptor)
+		}
+	}
+	return set, nil
 }
