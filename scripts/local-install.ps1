@@ -19,7 +19,7 @@ if (-not $PluginsDirectory) {
         $PluginsDirectory = [System.IO.Path]::Combine($env:APPDATA, 'terraform.d', 'plugins')
     }
     else {
-        $PluginsDirectory = [Syetem.IO.Path]::Combine($HOME, '.terraform.d', 'plugins')
+        $PluginsDirectory = [System.IO.Path]::Combine($HOME, '.terraform.d', 'plugins')
     }
 }
 
