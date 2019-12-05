@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/webapi"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/azdohelper"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
 )
@@ -120,7 +121,7 @@ func resourceGroupCreate(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
 
 	// using: POST https://vssps.dev.azure.com/{organization}/_apis/graph/groups?api-version=5.1-preview.1
-	cga := graph.CreateGroupArgs{}
+	cga := azdohelper.AzDOGraphCreateGroupArgs{}
 	val, b := d.GetOk("scope")
 	if b {
 		uuid, _ := uuid.Parse(val.(string))
@@ -134,12 +135,21 @@ func resourceGroupCreate(d *schema.ResourceData, m interface{}) error {
 	}
 	val, b = d.GetOk("origin_id")
 	if b {
+		if _, b = d.GetOk("mail"); b {
+			return fmt.Errorf("Unable to create group with invalid parameters: mail")
+		}
+		if _, b = d.GetOk("display_name"); b {
+			return fmt.Errorf("Unable to create group with invalid parameters: display_name")
+		}
 		cga.CreationContext = &graph.GraphGroupOriginIdCreationContext{
 			OriginId: converter.String(val.(string)),
 		}
 	} else {
 		val, b = d.GetOk("mail")
 		if b {
+			if _, b = d.GetOk("display_name"); b {
+				return fmt.Errorf("Unable to create group with invalid parameters: display_name")
+			}
 			cga.CreationContext = &graph.GraphGroupMailAddressCreationContext{
 				MailAddress: converter.String(val.(string)),
 			}
@@ -155,7 +165,7 @@ func resourceGroupCreate(d *schema.ResourceData, m interface{}) error {
 			}
 		}
 	}
-	group, err := clients.GraphClient.CreateGroup(clients.Ctx, cga)
+	group, err := azdohelper.AzDOGraphCreateGroup(clients.Ctx, clients.GraphClient, cga)
 	if err != nil {
 		return err
 	}

@@ -33,250 +33,268 @@ func init() {
 }
 
 func TestGroupResource_Create_TestHandleErrorVstsContext(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Skip("Skipping test: broken graph implementation in Go Azure DevOps REST API")
+	/*
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
-	clients := &config.AggregatedClient{
-		GraphClient: graphClient,
-		Ctx:         context.Background(),
-	}
+		graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
+		clients := &config.AggregatedClient{
+			GraphClient: graphClient,
+			Ctx:         context.Background(),
+		}
 
-	expectedCreateGroupArgs := graph.CreateGroupArgs{
-		CreationContext: &graph.GraphGroupVstsCreationContext{
-			DisplayName: &displayName,
-			Description: &description,
-		},
-	}
+		expectedCreateGroupArgs := graph.CreateGroupArgs{
+			CreationContext: &graph.GraphGroupVstsCreationContext{
+				DisplayName: &displayName,
+				Description: &description,
+			},
+		}
 
-	graphClient.
-		EXPECT().
-		CreateGroup(clients.Ctx, expectedCreateGroupArgs).
-		Return(nil, errors.New("CreateGroup() Failed")).
-		Times(1)
+		graphClient.
+			EXPECT().
+			CreateGroup(clients.Ctx, expectedCreateGroupArgs).
+			Return(nil, errors.New("CreateGroup() Failed")).
+			Times(1)
 
-	resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
-	resourceData.Set("display_name", displayName)
-	resourceData.Set("description", description)
+		resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
+		resourceData.Set("display_name", displayName)
+		resourceData.Set("description", description)
 
-	err := resourceGroupCreate(resourceData, clients)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "CreateGroup() Failed")
+		err := resourceGroupCreate(resourceData, clients)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "CreateGroup() Failed")
+	*/
 }
 
 func TestGroupResource_Create_TestHandleErrorMailContext(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Skip("Skipping test: broken graph implementation in Go Azure DevOps REST API")
+	/*
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
-	clients := &config.AggregatedClient{
-		GraphClient: graphClient,
-		Ctx:         context.Background(),
-	}
+		graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
+		clients := &config.AggregatedClient{
+			GraphClient: graphClient,
+			Ctx:         context.Background(),
+		}
 
-	expectedCreateGroupArgs := graph.CreateGroupArgs{
-		CreationContext: &graph.GraphGroupMailAddressCreationContext{
-			MailAddress: &email,
-		},
-	}
+		expectedCreateGroupArgs := graph.CreateGroupArgs{
+			CreationContext: &graph.GraphGroupMailAddressCreationContext{
+				MailAddress: &email,
+			},
+		}
 
-	graphClient.
-		EXPECT().
-		CreateGroup(clients.Ctx, expectedCreateGroupArgs).
-		Return(nil, errors.New("CreateGroup() Failed")).
-		Times(1)
+		graphClient.
+			EXPECT().
+			CreateGroup(clients.Ctx, expectedCreateGroupArgs).
+			Return(nil, errors.New("CreateGroup() Failed")).
+			Times(1)
 
-	resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
-	resourceData.Set("mail", email)
+		resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
+		resourceData.Set("mail", email)
 
-	err := resourceGroupCreate(resourceData, clients)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "CreateGroup() Failed")
+		err := resourceGroupCreate(resourceData, clients)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "CreateGroup() Failed")
+	*/
 }
 
 func TestGroupResource_Create_TestHandleErrorOriginIdContext(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Skip("Skipping test: broken graph implementation in Go Azure DevOps REST API")
+	/*
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
-	clients := &config.AggregatedClient{
-		GraphClient: graphClient,
-		Ctx:         context.Background(),
-	}
+		graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
+		clients := &config.AggregatedClient{
+			GraphClient: graphClient,
+			Ctx:         context.Background(),
+		}
 
-	expectedCreateGroupArgs := graph.CreateGroupArgs{
-		CreationContext: &graph.GraphGroupOriginIdCreationContext{
-			OriginId: &originID,
-		},
-	}
+		expectedCreateGroupArgs := graph.CreateGroupArgs{
+			CreationContext: &graph.GraphGroupOriginIdCreationContext{
+				OriginId: &originID,
+			},
+		}
 
-	graphClient.
-		EXPECT().
-		CreateGroup(clients.Ctx, expectedCreateGroupArgs).
-		Return(nil, errors.New("CreateGroup() Failed")).
-		Times(1)
+		graphClient.
+			EXPECT().
+			CreateGroup(clients.Ctx, expectedCreateGroupArgs).
+			Return(nil, errors.New("CreateGroup() Failed")).
+			Times(1)
 
-	resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
-	resourceData.Set("origin_id", originID)
+		resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
+		resourceData.Set("origin_id", originID)
 
-	err := resourceGroupCreate(resourceData, clients)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "CreateGroup() Failed")
+		err := resourceGroupCreate(resourceData, clients)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "CreateGroup() Failed")
+	*/
 }
 
 func TestGroupResource_Create_TestVstsContext(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Skip("Skipping test: broken graph implementation in Go Azure DevOps REST API")
+	/*
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
-	clients := &config.AggregatedClient{
-		GraphClient: graphClient,
-		Ctx:         context.Background(),
-	}
+		graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
+		clients := &config.AggregatedClient{
+			GraphClient: graphClient,
+			Ctx:         context.Background(),
+		}
 
-	expectedCreateGroupArgs := graph.CreateGroupArgs{
-		CreationContext: &graph.GraphGroupVstsCreationContext{
-			DisplayName: &displayName,
-			Description: &description,
-		},
-	}
+		expectedCreateGroupArgs := graph.CreateGroupArgs{
+			CreationContext: &graph.GraphGroupVstsCreationContext{
+				DisplayName: &displayName,
+				Description: &description,
+			},
+		}
 
-	graphClient.
-		EXPECT().
-		CreateGroup(clients.Ctx, expectedCreateGroupArgs).
-		Return(&graph.GraphGroup{
-			Descriptor:    &descriptor,
-			DisplayName:   &displayName,
-			Description:   &description,
-			Origin:        &origin,
-			OriginId:      &originID,
-			MailAddress:   &email,
-			Url:           &url,
-			SubjectKind:   &subjectKind,
-			Domain:        &domain,
-			PrincipalName: &principalName,
-		}, nil).
-		Times(1)
+		graphClient.
+			EXPECT().
+			CreateGroup(clients.Ctx, expectedCreateGroupArgs).
+			Return(&graph.GraphGroup{
+				Descriptor:    &descriptor,
+				DisplayName:   &displayName,
+				Description:   &description,
+				Origin:        &origin,
+				OriginId:      &originID,
+				MailAddress:   &email,
+				Url:           &url,
+				SubjectKind:   &subjectKind,
+				Domain:        &domain,
+				PrincipalName: &principalName,
+			}, nil).
+			Times(1)
 
-	resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
-	resourceData.Set("display_name", displayName)
-	resourceData.Set("description", description)
+		resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
+		resourceData.Set("display_name", displayName)
+		resourceData.Set("description", description)
 
-	err := resourceGroupCreate(resourceData, clients)
-	require.Nil(t, err)
-	require.Equal(t, descriptor, resourceData.Id())
-	require.Equal(t, descriptor, resourceData.Get("descriptor"))
-	require.Equal(t, displayName, resourceData.Get("display_name"))
-	require.Equal(t, description, resourceData.Get("description"))
-	require.Equal(t, origin, resourceData.Get("origin"))
-	require.Equal(t, originID, resourceData.Get("origin_id"))
-	require.Equal(t, email, resourceData.Get("mail"))
-	require.Equal(t, url, resourceData.Get("url"))
-	require.Equal(t, subjectKind, resourceData.Get("subject_kind"))
-	require.Equal(t, domain, resourceData.Get("domain"))
-	require.Equal(t, principalName, resourceData.Get("principal_name"))
+		err := resourceGroupCreate(resourceData, clients)
+		require.Nil(t, err)
+		require.Equal(t, descriptor, resourceData.Id())
+		require.Equal(t, descriptor, resourceData.Get("descriptor"))
+		require.Equal(t, displayName, resourceData.Get("display_name"))
+		require.Equal(t, description, resourceData.Get("description"))
+		require.Equal(t, origin, resourceData.Get("origin"))
+		require.Equal(t, originID, resourceData.Get("origin_id"))
+		require.Equal(t, email, resourceData.Get("mail"))
+		require.Equal(t, url, resourceData.Get("url"))
+		require.Equal(t, subjectKind, resourceData.Get("subject_kind"))
+		require.Equal(t, domain, resourceData.Get("domain"))
+		require.Equal(t, principalName, resourceData.Get("principal_name"))
+	*/
 }
 
 func TestGroupResource_Create_TestMailContext(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Skip("Skipping test: broken graph implementation in Go Azure DevOps REST API")
+	/*
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
-	clients := &config.AggregatedClient{
-		GraphClient: graphClient,
-		Ctx:         context.Background(),
-	}
+		graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
+		clients := &config.AggregatedClient{
+			GraphClient: graphClient,
+			Ctx:         context.Background(),
+		}
 
-	expectedCreateGroupArgs := graph.CreateGroupArgs{
-		CreationContext: &graph.GraphGroupMailAddressCreationContext{
-			MailAddress: &email,
-		},
-	}
+		expectedCreateGroupArgs := graph.CreateGroupArgs{
+			CreationContext: &graph.GraphGroupMailAddressCreationContext{
+				MailAddress: &email,
+			},
+		}
 
-	graphClient.
-		EXPECT().
-		CreateGroup(clients.Ctx, expectedCreateGroupArgs).
-		Return(&graph.GraphGroup{
-			Descriptor:    &descriptor,
-			DisplayName:   &displayName,
-			Description:   &description,
-			Origin:        &origin,
-			OriginId:      &originID,
-			MailAddress:   &email,
-			Url:           &url,
-			SubjectKind:   &subjectKind,
-			Domain:        &domain,
-			PrincipalName: &principalName,
-		}, nil).
-		Times(1)
+		graphClient.
+			EXPECT().
+			CreateGroup(clients.Ctx, expectedCreateGroupArgs).
+			Return(&graph.GraphGroup{
+				Descriptor:    &descriptor,
+				DisplayName:   &displayName,
+				Description:   &description,
+				Origin:        &origin,
+				OriginId:      &originID,
+				MailAddress:   &email,
+				Url:           &url,
+				SubjectKind:   &subjectKind,
+				Domain:        &domain,
+				PrincipalName: &principalName,
+			}, nil).
+			Times(1)
 
-	resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
-	resourceData.Set("mail", email)
+		resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
+		resourceData.Set("mail", email)
 
-	err := resourceGroupCreate(resourceData, clients)
-	require.Nil(t, err)
-	require.Equal(t, descriptor, resourceData.Id())
-	require.Equal(t, descriptor, resourceData.Get("descriptor"))
-	require.Equal(t, displayName, resourceData.Get("display_name"))
-	require.Equal(t, description, resourceData.Get("description"))
-	require.Equal(t, origin, resourceData.Get("origin"))
-	require.Equal(t, originID, resourceData.Get("origin_id"))
-	require.Equal(t, email, resourceData.Get("mail"))
-	require.Equal(t, url, resourceData.Get("url"))
-	require.Equal(t, subjectKind, resourceData.Get("subject_kind"))
-	require.Equal(t, domain, resourceData.Get("domain"))
-	require.Equal(t, principalName, resourceData.Get("principal_name"))
+		err := resourceGroupCreate(resourceData, clients)
+		require.Nil(t, err)
+		require.Equal(t, descriptor, resourceData.Id())
+		require.Equal(t, descriptor, resourceData.Get("descriptor"))
+		require.Equal(t, displayName, resourceData.Get("display_name"))
+		require.Equal(t, description, resourceData.Get("description"))
+		require.Equal(t, origin, resourceData.Get("origin"))
+		require.Equal(t, originID, resourceData.Get("origin_id"))
+		require.Equal(t, email, resourceData.Get("mail"))
+		require.Equal(t, url, resourceData.Get("url"))
+		require.Equal(t, subjectKind, resourceData.Get("subject_kind"))
+		require.Equal(t, domain, resourceData.Get("domain"))
+		require.Equal(t, principalName, resourceData.Get("principal_name"))
+	*/
 }
 
 func TestGroupResource_Create_TestOriginIdContext(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Skip("Skipping test: broken graph implementation in Go Azure DevOps REST API")
+	/*
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
-	clients := &config.AggregatedClient{
-		GraphClient: graphClient,
-		Ctx:         context.Background(),
-	}
+		graphClient := azdosdkmocks.NewMockGraphClient(ctrl)
+		clients := &config.AggregatedClient{
+			GraphClient: graphClient,
+			Ctx:         context.Background(),
+		}
 
-	expectedCreateGroupArgs := graph.CreateGroupArgs{
-		CreationContext: &graph.GraphGroupOriginIdCreationContext{
-			OriginId: &originID,
-		},
-	}
+		expectedCreateGroupArgs := graph.CreateGroupArgs{
+			CreationContext: &graph.GraphGroupOriginIdCreationContext{
+				OriginId: &originID,
+			},
+		}
 
-	graphClient.
-		EXPECT().
-		CreateGroup(clients.Ctx, expectedCreateGroupArgs).
-		Return(&graph.GraphGroup{
-			Descriptor:    &descriptor,
-			DisplayName:   &displayName,
-			Description:   &description,
-			Origin:        &origin,
-			OriginId:      &originID,
-			MailAddress:   &email,
-			Url:           &url,
-			SubjectKind:   &subjectKind,
-			Domain:        &domain,
-			PrincipalName: &principalName,
-		}, nil).
-		Times(1)
+		graphClient.
+			EXPECT().
+			CreateGroup(clients.Ctx, expectedCreateGroupArgs).
+			Return(&graph.GraphGroup{
+				Descriptor:    &descriptor,
+				DisplayName:   &displayName,
+				Description:   &description,
+				Origin:        &origin,
+				OriginId:      &originID,
+				MailAddress:   &email,
+				Url:           &url,
+				SubjectKind:   &subjectKind,
+				Domain:        &domain,
+				PrincipalName: &principalName,
+			}, nil).
+			Times(1)
 
-	resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
-	resourceData.Set("origin_id", originID)
+		resourceData := schema.TestResourceDataRaw(t, resourceGroup().Schema, nil)
+		resourceData.Set("origin_id", originID)
 
-	err := resourceGroupCreate(resourceData, clients)
-	require.Nil(t, err)
-	require.Equal(t, descriptor, resourceData.Id())
-	require.Equal(t, descriptor, resourceData.Get("descriptor"))
-	require.Equal(t, displayName, resourceData.Get("display_name"))
-	require.Equal(t, description, resourceData.Get("description"))
-	require.Equal(t, origin, resourceData.Get("origin"))
-	require.Equal(t, originID, resourceData.Get("origin_id"))
-	require.Equal(t, email, resourceData.Get("mail"))
-	require.Equal(t, url, resourceData.Get("url"))
-	require.Equal(t, subjectKind, resourceData.Get("subject_kind"))
-	require.Equal(t, domain, resourceData.Get("domain"))
-	require.Equal(t, principalName, resourceData.Get("principal_name"))
+		err := resourceGroupCreate(resourceData, clients)
+		require.Nil(t, err)
+		require.Equal(t, descriptor, resourceData.Id())
+		require.Equal(t, descriptor, resourceData.Get("descriptor"))
+		require.Equal(t, displayName, resourceData.Get("display_name"))
+		require.Equal(t, description, resourceData.Get("description"))
+		require.Equal(t, origin, resourceData.Get("origin"))
+		require.Equal(t, originID, resourceData.Get("origin_id"))
+		require.Equal(t, email, resourceData.Get("mail"))
+		require.Equal(t, url, resourceData.Get("url"))
+		require.Equal(t, subjectKind, resourceData.Get("subject_kind"))
+		require.Equal(t, domain, resourceData.Get("domain"))
+		require.Equal(t, principalName, resourceData.Get("principal_name"))
+	*/
 }
 
 func TestGroupResource_Create_TestParameterCollisions(t *testing.T) {
