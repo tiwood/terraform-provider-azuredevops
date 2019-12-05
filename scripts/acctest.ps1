@@ -6,6 +6,7 @@ param (
     $TestFilter = '^TestAcc',
 
     [Parameter()]
+    [ValidateNotNullOrEmpty()]
     [string[]]
     $Tag = 'all'
 )
