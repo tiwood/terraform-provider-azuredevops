@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"reflect"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
@@ -28,7 +26,6 @@ type AzDOGraphCreateGroupArgs struct {
 
 // AzDOGraphCreateGroup This function is temporary fix, as long as the Azure DevOps GO API can't handle different group creation args properly
 func AzDOGraphCreateGroup(ctx context.Context, client graph.Client, args AzDOGraphCreateGroupArgs) (*graph.GraphGroup, error) {
-	time.Sleep(25 * time.Second)
 
 	if args.CreationContext == nil {
 		return nil, &azuredevops.ArgumentNilError{ArgumentName: "args.CreationContext"}
@@ -42,15 +39,12 @@ func AzDOGraphCreateGroup(ctx context.Context, client graph.Client, args AzDOGra
 		queryParams.Add("groupDescriptors", listAsString)
 	}
 
-	t := reflect.TypeOf(args.CreationContext)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	if t != reflect.TypeOf((*graph.GraphGroupMailAddressCreationContext)(nil)).Elem() &&
-		t != reflect.TypeOf((*graph.GraphGroupOriginIdCreationContext)(nil)).Elem() &&
-		t != reflect.TypeOf((*graph.GraphGroupVstsCreationContext)(nil)).Elem() {
-		return nil, fmt.Errorf("Unsupported group creation context: %T", t)
+	if _, ok := args.CreationContext.(*graph.GraphGroupMailAddressCreationContext); !ok {
+		if _, ok := args.CreationContext.(*graph.GraphGroupOriginIdCreationContext); !ok {
+			if _, ok := args.CreationContext.(*graph.GraphGroupVstsCreationContext); !ok {
+				return nil, fmt.Errorf("Unsupported group creation context")
+			}
+		}
 	}
 
 	body, marshalErr := json.Marshal(args.CreationContext)
