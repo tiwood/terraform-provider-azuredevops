@@ -97,6 +97,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 			Name:       "PrincipalName",
 			Value:      principalName,
 			IgnoreCase: true,
+			AllowNil:   false,
 		})
 	}
 	if origin != "" {
@@ -104,6 +105,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 			Name:       "Origin",
 			Value:      origin,
 			IgnoreCase: true,
+			AllowNil:   false,
 		})
 	}
 	if originID != "" {
@@ -111,6 +113,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 			Name:       "OriginId",
 			Value:      originID,
 			IgnoreCase: true,
+			AllowNil:   false,
 		})
 	}
 
@@ -190,6 +193,7 @@ type AttributeComparison struct {
 	Name       string
 	Value      string
 	IgnoreCase bool
+	AllowNil   bool
 }
 
 func filterUsersByAttributeValues(input *[]graph.GraphUser, comparison *[]AttributeComparison) ([]graph.GraphUser, error) {
@@ -207,8 +211,12 @@ func filterUsersByAttributeValues(input *[]graph.GraphUser, comparison *[]Attrib
 		for _, comp := range *comparison {
 			f := s.FieldByName(comp.Name)
 			if f.Kind() == reflect.Ptr && f.IsNil() {
-				b = false
-				break
+				if comp.AllowNil {
+					continue
+				} else {
+					b = false
+					break
+				}
 			}
 			v := reflect.Indirect(f).Interface().(string)
 			if comp.IgnoreCase {
