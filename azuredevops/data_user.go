@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
 	"github.com/hashicorp/terraform/helper/hashcode"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/validate"
 )
 
 func dataUsers() *schema.Resource {
@@ -23,7 +23,7 @@ func dataUsers() *schema.Resource {
 			"principal_name": {
 				Type:          schema.TypeString,
 				Optional:      true,
-				ValidateFunc:  validation.NoZeroValues,
+				ValidateFunc:  validate.NoEmptyStrings,
 				ConflictsWith: []string{"origin", "origin_id"},
 			},
 			"subject_types": {
@@ -37,13 +37,13 @@ func dataUsers() *schema.Resource {
 			"origin": {
 				Type:          schema.TypeString,
 				Optional:      true,
-				ValidateFunc:  validation.NoZeroValues,
+				ValidateFunc:  validate.NoEmptyStrings,
 				ConflictsWith: []string{"principal_name"},
 			},
 			"origin_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
-				ValidateFunc:  validation.NoZeroValues,
+				ValidateFunc:  validate.NoEmptyStrings,
 				ConflictsWith: []string{"principal_name"},
 			},
 			"users": {
@@ -137,7 +137,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 		users = append(users, fusers...)
 	}
 
-	descriptors, err := getValueSlice(&users, "descriptor")
+	descriptors, err := getValueSliceByName(&users, "descriptor")
 	if err != nil {
 		return err
 	}
@@ -162,30 +162,44 @@ func convertToStringSlice(input []interface{}) []string {
 	return result
 }
 
-func getValueSlice(input *[]interface{}, attributeName string) ([]string, error) {
+func getValueByName(input interface{}, name string) (interface{}, error) {
+	s := reflect.ValueOf(input)
+	if s.Kind() == reflect.Ptr {
+		if s.IsNil() {
+			return nil, nil
+		}
+		s = s.Elem()
+	}
+	if s.Kind() == reflect.Struct {
+		f := s.FieldByName(name)
+		if f.Kind() == reflect.Ptr && f.IsNil() {
+			return nil, nil
+		}
+		return reflect.Indirect(f).Interface(), nil
+	} else if s.Kind() == reflect.Map {
+		ifc := s.Interface()
+		if imap, ok := ifc.(map[string]interface{}); ok {
+			return imap[name], nil
+		}
+		return nil, fmt.Errorf("Map %t must be of form map[string]interface{}", s)
+	}
+	return nil, fmt.Errorf("Type %t is not a structured type (struct, map)", s)
+}
+
+func getValueSliceByName(input *[]interface{}, attributeName string) ([]string, error) {
 	if input == nil {
 		return []string{}, nil
 	}
 
-	output := make([]string, len(*input))
+	output := make([]interface{}, len(*input))
 	for i, user := range *input {
-		s := reflect.ValueOf(user)
-		if s.Kind() == reflect.Ptr {
-			s = s.Elem()
+		v, err := getValueByName(user, attributeName)
+		if err != nil {
+			return nil, err
 		}
-		if s.Kind() == reflect.Struct {
-			f := s.FieldByName(attributeName)
-			v := reflect.Indirect(f).Interface().(string)
-			output = append(output, v)
-		} else if s.Kind() == reflect.Map {
-			ifc := s.Interface()
-			imap := ifc.(map[string]interface{})
-			output[i] = imap[attributeName].(string)
-		} else {
-			panic("Unsupported type")
-		}
+		output[i] = v
 	}
-	return output, nil
+	return convertToStringSlice(output), nil
 }
 
 // AttributeComparison defines a comparison on an (struct) attribute
@@ -207,10 +221,12 @@ func filterUsersByAttributeValues(input *[]graph.GraphUser, comparison *[]Attrib
 	output := []graph.GraphUser{}
 	for _, user := range *input {
 		b := true
-		s := reflect.ValueOf(user)
 		for _, comp := range *comparison {
-			f := s.FieldByName(comp.Name)
-			if f.Kind() == reflect.Ptr && f.IsNil() {
+			v, err := getValueByName(user, comp.Name)
+			if err != nil {
+				return nil, err
+			}
+			if v == nil {
 				if comp.AllowNil {
 					continue
 				} else {
@@ -218,14 +234,13 @@ func filterUsersByAttributeValues(input *[]graph.GraphUser, comparison *[]Attrib
 					break
 				}
 			}
-			v := reflect.Indirect(f).Interface().(string)
 			if comp.IgnoreCase {
-				if !strings.EqualFold(comp.Value, v) {
+				if !strings.EqualFold(comp.Value, v.(string)) {
 					b = false
 					break
 				}
 			} else {
-				if comp.Value != v {
+				if comp.Value != v.(string) {
 					b = false
 					break
 				}
