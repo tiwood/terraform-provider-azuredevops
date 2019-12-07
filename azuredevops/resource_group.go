@@ -1,15 +1,21 @@
 package azuredevops
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
 
+	"github.com/microsoft/azure-devops-go-api/azuredevops"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/webapi"
-	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/azdohelper"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
 )
@@ -117,11 +123,61 @@ func resourceGroup() *schema.Resource {
 	}
 }
 
+type azDOGraphCreateGroupArgs struct {
+	// (required) The subset of the full graph group used to uniquely find the graph subject in an external provider.
+	CreationContext interface{}
+	// (optional) A descriptor referencing the scope (collection, project) in which the group should be created.
+	// If omitted, will be created in the scope of the enclosing account or organization. Valid only for VSTS groups.
+	ScopeDescriptor *string
+	// (optional) A comma separated list of descriptors referencing groups you want the graph group to join
+	GroupDescriptors *[]string
+}
+
+func azDOGraphCreateGroup(ctx context.Context, client graph.Client, args azDOGraphCreateGroupArgs) (*graph.GraphGroup, error) {
+
+	if args.CreationContext == nil {
+		return nil, &azuredevops.ArgumentNilError{ArgumentName: "args.CreationContext"}
+	}
+	queryParams := url.Values{}
+	if args.ScopeDescriptor != nil {
+		queryParams.Add("scopeDescriptor", *args.ScopeDescriptor)
+	}
+	if args.GroupDescriptors != nil {
+		listAsString := strings.Join((*args.GroupDescriptors)[:], ",")
+		queryParams.Add("groupDescriptors", listAsString)
+	}
+
+	if _, ok := args.CreationContext.(*graph.GraphGroupMailAddressCreationContext); !ok {
+		if _, ok := args.CreationContext.(*graph.GraphGroupOriginIdCreationContext); !ok {
+			if _, ok := args.CreationContext.(*graph.GraphGroupVstsCreationContext); !ok {
+				return nil, fmt.Errorf("Unsupported group creation context")
+			}
+		}
+	}
+
+	body, marshalErr := json.Marshal(args.CreationContext)
+	if marshalErr != nil {
+		return nil, marshalErr
+	}
+	locationID, _ := uuid.Parse("ebbe6af8-0b91-4c13-8cf1-777c14858188")
+	if clientImpl, ok := client.(*graph.ClientImpl); ok {
+		resp, err := clientImpl.Client.Send(ctx, http.MethodPost, locationID, "5.1-preview.1", nil, queryParams, bytes.NewReader(body), "application/json", "application/json", nil)
+		if err != nil {
+			return nil, err
+		}
+		var responseValue graph.GraphGroup
+		err = clientImpl.Client.UnmarshalBody(resp, &responseValue)
+		return &responseValue, err
+	}
+
+	panic("Invalid Azure DevOps Graph client implementation")
+}
+
 func resourceGroupCreate(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
 
 	// using: POST https://vssps.dev.azure.com/{organization}/_apis/graph/groups?api-version=5.1-preview.1
-	cga := azdohelper.AzDOGraphCreateGroupArgs{}
+	cga := azDOGraphCreateGroupArgs{}
 	val, b := d.GetOk("scope")
 	if b {
 		uuid, _ := uuid.Parse(val.(string))
@@ -165,7 +221,7 @@ func resourceGroupCreate(d *schema.ResourceData, m interface{}) error {
 			}
 		}
 	}
-	group, err := azdohelper.AzDOGraphCreateGroup(clients.Ctx, clients.GraphClient, cga)
+	group, err := azDOGraphCreateGroup(clients.Ctx, clients.GraphClient, cga)
 	if err != nil {
 		return err
 	}
