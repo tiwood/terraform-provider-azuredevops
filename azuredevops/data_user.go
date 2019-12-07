@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
@@ -85,8 +84,6 @@ func dataUsers() *schema.Resource {
 }
 
 func dataUserRead(d *schema.ResourceData, m interface{}) error {
-	time.Sleep(20 * time.Second)
-
 	clients := m.(*config.AggregatedClient)
 	users := make([]interface{}, 0)
 
@@ -94,6 +91,28 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 	principalName := d.Get("principal_name").(string)
 	origin := d.Get("origin").(string)
 	originID := d.Get("origin_id").(string)
+	comp := []AttributeComparison{}
+	if principalName != "" {
+		comp = append(comp, AttributeComparison{
+			Name:       "PrincipalName",
+			Value:      principalName,
+			IgnoreCase: true,
+		})
+	}
+	if origin != "" {
+		comp = append(comp, AttributeComparison{
+			Name:       "Origin",
+			Value:      origin,
+			IgnoreCase: true,
+		})
+	}
+	if originID != "" {
+		comp = append(comp, AttributeComparison{
+			Name:       "OriginId",
+			Value:      originID,
+			IgnoreCase: true,
+		})
+	}
 
 	var currentToken string
 	for hasMore := true; hasMore; {
@@ -103,23 +122,10 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 		if err != nil {
 			return err
 		}
-		if principalName != "" {
-			newUsers, err = filterUsersByAttributeValue(principalName, &newUsers, "PrincipalName", true)
-			if err != nil {
-				return err
-			}
-		}
-		if origin != "" {
-			newUsers, err = filterUsersByAttributeValue(origin, &newUsers, "Origin", true)
-			if err != nil {
-				return err
-			}
-		}
-		if originID != "" {
-			newUsers, err = filterUsersByAttributeValue(originID, &newUsers, "OriginId", true)
-			if err != nil {
-				return err
-			}
+
+		newUsers, err = filterUsersByAttributeValues(&newUsers, &comp)
+		if err != nil {
+			return err
 		}
 		fusers, err := flattenUsers(&newUsers)
 		if err != nil {
@@ -128,7 +134,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 		users = append(users, fusers...)
 	}
 
-	descriptors, err := getValueSlice(&users, "Descriptor")
+	descriptors, err := getValueSlice(&users, "descriptor")
 	if err != nil {
 		return err
 	}
@@ -159,32 +165,67 @@ func getValueSlice(input *[]interface{}, attributeName string) ([]string, error)
 	}
 
 	output := make([]string, len(*input))
-	for _, user := range *input {
+	for i, user := range *input {
 		s := reflect.ValueOf(user)
-		output = append(output, s.FieldByName(attributeName).String())
+		if s.Kind() == reflect.Ptr {
+			s = s.Elem()
+		}
+		if s.Kind() == reflect.Struct {
+			f := s.FieldByName(attributeName)
+			v := reflect.Indirect(f).Interface().(string)
+			output = append(output, v)
+		} else if s.Kind() == reflect.Map {
+			ifc := s.Interface()
+			imap := ifc.(map[string]interface{})
+			output[i] = imap[attributeName].(string)
+		} else {
+			panic("Unsupported type")
+		}
 	}
 	return output, nil
 }
 
-func filterUsersByAttributeValue(attributeValue string, input *[]graph.GraphUser, attributeName string, ignoreCase bool) ([]graph.GraphUser, error) {
+// AttributeComparison defines a comparison on an (struct) attribute
+type AttributeComparison struct {
+	Name       string
+	Value      string
+	IgnoreCase bool
+}
+
+func filterUsersByAttributeValues(input *[]graph.GraphUser, comparison *[]AttributeComparison) ([]graph.GraphUser, error) {
 	if input == nil {
 		return []graph.GraphUser{}, nil
 	}
+	if comparison == nil || len(*comparison) <= 0 {
+		return *input, nil
+	}
 
-	output := make([]graph.GraphUser, len(*input))
+	output := []graph.GraphUser{}
 	for _, user := range *input {
+		b := true
 		s := reflect.ValueOf(user)
-		v := s.FieldByName(attributeName).String()
-		if ignoreCase {
-			if !strings.EqualFold(attributeValue, v) {
-				continue
+		for _, comp := range *comparison {
+			f := s.FieldByName(comp.Name)
+			if f.Kind() == reflect.Ptr && f.IsNil() {
+				b = false
+				break
 			}
-		} else {
-			if attributeValue != v {
-				continue
+			v := reflect.Indirect(f).Interface().(string)
+			if comp.IgnoreCase {
+				if !strings.EqualFold(comp.Value, v) {
+					b = false
+					break
+				}
+			} else {
+				if comp.Value != v {
+					b = false
+					break
+				}
 			}
 		}
-		output = append(output, user)
+		if b {
+			output = append(output, user)
+		}
 	}
 	return output, nil
 }
@@ -198,12 +239,12 @@ func flattenUsers(input *[]graph.GraphUser) ([]interface{}, error) {
 		return []interface{}{}, nil
 	}
 	results := make([]interface{}, len(*input))
-	for _, element := range *input {
+	for i, element := range *input {
 		output, err := flattenUser(&element)
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, output)
+		results[i] = output
 	}
 	return results, nil
 }
