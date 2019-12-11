@@ -1,6 +1,7 @@
 package converter
 
 import (
+	"crypto/sha1"
 	"fmt"
 	"reflect"
 	"strings"
@@ -171,4 +172,15 @@ func FilterObjectsByAttributeValues(input interface{}, comparison *[]AttributeCo
 		}
 	}
 	return output.Interface().([]interface{}), nil
+}
+
+// ToSHA1Hash returns a SHA1 hash code of a string slice, where the elements are concatenated using '-' as separator at first
+func ToSHA1Hash(input *[]string) ([]byte, error) {
+	h := sha1.New()
+	if input != nil {
+		if _, err := h.Write([]byte(strings.Join(*input, "-"))); err != nil {
+			return nil, fmt.Errorf("Unable to compute hash for user descriptors: %v", err)
+		}
+	}
+	return h.Sum(nil), nil
 }

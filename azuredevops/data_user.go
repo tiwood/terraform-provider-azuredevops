@@ -1,10 +1,8 @@
 package azuredevops
 
 import (
-	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform/helper/hashcode"
@@ -138,11 +136,11 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 	}
 
 	descriptors := converter.ToStringSlice(converter.GetValueSliceByName(&users, "descriptor"))
-	h := sha1.New()
-	if _, err := h.Write([]byte(strings.Join(descriptors, "-"))); err != nil {
-		return fmt.Errorf("Unable to compute hash for user descriptors: %v", err)
+	h, err := converter.ToSHA1Hash(&descriptors)
+	if err != nil {
+		return err
 	}
-	d.SetId("users#" + base64.URLEncoding.EncodeToString(h.Sum(nil)))
+	d.SetId("users#" + base64.URLEncoding.EncodeToString(h))
 	if err := d.Set("users", users); err != nil {
 		return fmt.Errorf("Error setting `users`: %+v", err)
 	}
