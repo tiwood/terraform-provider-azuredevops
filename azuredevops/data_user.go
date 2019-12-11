@@ -4,13 +4,13 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform/helper/hashcode"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/validate"
 )
 
@@ -87,13 +87,13 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
 	users := make([]interface{}, 0)
 
-	subjectTypes := convertToStringSlice(d.Get("subject_types").(*schema.Set).List())
+	subjectTypes := converter.ToStringSlice(d.Get("subject_types").(*schema.Set).List())
 	principalName := d.Get("principal_name").(string)
 	origin := d.Get("origin").(string)
 	originID := d.Get("origin_id").(string)
-	comp := []AttributeComparison{}
+	comp := []converter.AttributeComparison{}
 	if principalName != "" {
-		comp = append(comp, AttributeComparison{
+		comp = append(comp, converter.AttributeComparison{
 			Name:       "PrincipalName",
 			Value:      principalName,
 			IgnoreCase: true,
@@ -101,7 +101,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 		})
 	}
 	if origin != "" {
-		comp = append(comp, AttributeComparison{
+		comp = append(comp, converter.AttributeComparison{
 			Name:       "Origin",
 			Value:      origin,
 			IgnoreCase: true,
@@ -109,7 +109,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 		})
 	}
 	if originID != "" {
-		comp = append(comp, AttributeComparison{
+		comp = append(comp, converter.AttributeComparison{
 			Name:       "OriginId",
 			Value:      originID,
 			IgnoreCase: true,
@@ -126,7 +126,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 			return err
 		}
 
-		newUsers, err = filterUsersByAttributeValues(&newUsers, &comp)
+		newUsers, err = getGraphUserSlice(converter.FilterObjectsByAttributeValues(&newUsers, &comp))
 		if err != nil {
 			return err
 		}
@@ -137,10 +137,7 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 		users = append(users, fusers...)
 	}
 
-	descriptors, err := getValueSliceByName(&users, "descriptor")
-	if err != nil {
-		return err
-	}
+	descriptors := converter.ToStringSlice(converter.GetValueSliceByName(&users, "descriptor"))
 	h := sha1.New()
 	if _, err := h.Write([]byte(strings.Join(descriptors, "-"))); err != nil {
 		return fmt.Errorf("Unable to compute hash for user descriptors: %v", err)
@@ -153,104 +150,8 @@ func dataUserRead(d *schema.ResourceData, m interface{}) error {
 	return nil
 }
 
-func convertToStringSlice(input []interface{}) []string {
-	result := make([]string, len(input))
-	for i, k := range input {
-		result[i] = k.(string)
-	}
-
-	return result
-}
-
-func getValueByName(input interface{}, name string) (interface{}, error) {
-	s := reflect.ValueOf(input)
-	if s.Kind() == reflect.Ptr {
-		if s.IsNil() {
-			return nil, nil
-		}
-		s = s.Elem()
-	}
-	if s.Kind() == reflect.Struct {
-		f := s.FieldByName(name)
-		if f.Kind() == reflect.Ptr && f.IsNil() {
-			return nil, nil
-		}
-		return reflect.Indirect(f).Interface(), nil
-	} else if s.Kind() == reflect.Map {
-		ifc := s.Interface()
-		if imap, ok := ifc.(map[string]interface{}); ok {
-			return imap[name], nil
-		}
-		return nil, fmt.Errorf("Map %t must be of form map[string]interface{}", s)
-	}
-	return nil, fmt.Errorf("Type %t is not a structured type (struct, map)", s)
-}
-
-func getValueSliceByName(input *[]interface{}, attributeName string) ([]string, error) {
-	if input == nil {
-		return []string{}, nil
-	}
-
-	output := make([]interface{}, len(*input))
-	for i, user := range *input {
-		v, err := getValueByName(user, attributeName)
-		if err != nil {
-			return nil, err
-		}
-		output[i] = v
-	}
-	return convertToStringSlice(output), nil
-}
-
-// AttributeComparison defines a comparison on an (struct) attribute
-type AttributeComparison struct {
-	Name       string
-	Value      string
-	IgnoreCase bool
-	AllowNil   bool
-}
-
-func filterUsersByAttributeValues(input *[]graph.GraphUser, comparison *[]AttributeComparison) ([]graph.GraphUser, error) {
-	if input == nil {
-		return []graph.GraphUser{}, nil
-	}
-	if comparison == nil || len(*comparison) <= 0 {
-		return *input, nil
-	}
-
-	output := []graph.GraphUser{}
-	for _, user := range *input {
-		b := true
-		for _, comp := range *comparison {
-			v, err := getValueByName(user, comp.Name)
-			if err != nil {
-				return nil, err
-			}
-			if v == nil {
-				if comp.AllowNil {
-					continue
-				} else {
-					b = false
-					break
-				}
-			}
-			if comp.IgnoreCase {
-				if !strings.EqualFold(comp.Value, v.(string)) {
-					b = false
-					break
-				}
-			} else {
-				if comp.Value != v.(string) {
-					b = false
-					break
-				}
-			}
-		}
-		if b {
-			output = append(output, user)
-		}
-	}
-	return output, nil
+func getGraphUserSlice(input interface{}, err error) ([]graph.GraphUser, error) {
+	return input.([]graph.GraphUser), err
 }
 
 func getUserHash(v interface{}) int {
