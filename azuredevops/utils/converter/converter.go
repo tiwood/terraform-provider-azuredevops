@@ -79,7 +79,12 @@ func ToStringSlice(input []interface{}) []string {
 
 // GetValueByName returns a value from a structured type like mape and struct
 func GetValueByName(input interface{}, name string) interface{} {
-	s := reflect.ValueOf(input)
+	var s reflect.Value
+	if reflect.TypeOf(input) == reflect.TypeOf((*reflect.Value)(nil)).Elem() {
+		s = input.(reflect.Value)
+	} else {
+		s = reflect.ValueOf(input)
+	}
 	if s.Kind() == reflect.Ptr {
 		if s.IsNil() {
 			return nil
@@ -88,10 +93,16 @@ func GetValueByName(input interface{}, name string) interface{} {
 	}
 	if s.Kind() == reflect.Struct {
 		f := s.FieldByName(name)
-		if f.Kind() == reflect.Ptr && f.IsNil() {
-			return nil
+		if !f.IsValid() {
+			panic(fmt.Sprintf("Struct does not contain property %s", name))
 		}
-		return reflect.Indirect(f).Interface()
+		if f.Kind() == reflect.Ptr {
+			if f.IsNil() {
+				return nil
+			}
+			f = reflect.Indirect(f)
+		}
+		return f.Interface()
 	} else if s.Kind() == reflect.Map {
 		ifc := s.Interface()
 		if imap, ok := ifc.(map[string]interface{}); ok {
@@ -126,7 +137,11 @@ type AttributeComparison struct {
 // FilterObjectsByAttributeValues returns a filtered slice of objects by an array of comparisons
 func FilterObjectsByAttributeValues(input interface{}, comparison *[]AttributeComparison) ([]interface{}, error) {
 	if comparison == nil || len(*comparison) <= 0 {
-		return input.([]interface{}), nil
+		t := reflect.TypeOf(input)
+		if t.Kind() == reflect.Ptr {
+			return reflect.Indirect(reflect.ValueOf(input)).Interface(), nil
+		}
+		return input, nil
 	}
 
 	vi := reflect.ValueOf(input)
@@ -167,7 +182,7 @@ func FilterObjectsByAttributeValues(input interface{}, comparison *[]AttributeCo
 				}
 			}
 			if b {
-				output = reflect.Append(output, reflect.ValueOf(user))
+				output = reflect.Append(output, user)
 			}
 		}
 	}
