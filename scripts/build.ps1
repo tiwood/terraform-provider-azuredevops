@@ -4,7 +4,10 @@ param (
     $SkipTests,
 
     [switch]
-    $Install
+    $Install,
+
+    [switch]
+    $DebugBuild
 )
 
 $script:PSDefaultParameterValues = @{
@@ -37,7 +40,16 @@ function compile() {
         if ($LASTEXITCODE) {
             throw "Failed to download modules"
         }
-        go build -o "$BUILD_DIR/$BUILD_ARTIFACT"
+
+        $argv = @(
+            'build',
+            '-o',
+            "$BUILD_DIR/$BUILD_ARTIFACT"
+        )
+        if ($DebugBuild) {
+            $argv += @( '-gcflags="all=-N -l"' )
+        }
+        go @argv 
         if ($LASTEXITCODE) {
             throw "Build failed"
         }
