@@ -108,9 +108,9 @@ func GetValueByName(input interface{}, name string) interface{} {
 		if imap, ok := ifc.(map[string]interface{}); ok {
 			return imap[name]
 		}
-		panic(fmt.Sprintf("Map %t must be of form map[string]interface{}", s))
+		panic(fmt.Sprintf("Map %T must be of form map[string]interface{}", s))
 	}
-	panic(fmt.Sprintf("Type %t is not a structured type (struct, map)", s))
+	panic(fmt.Sprintf("Type %T is not a structured type (struct, map)", s))
 }
 
 // GetValueSliceByName returns a slice of values intified by an attribute name
@@ -135,7 +135,7 @@ type AttributeComparison struct {
 }
 
 // FilterObjectsByAttributeValues returns a filtered slice of objects by an array of comparisons
-func FilterObjectsByAttributeValues(input interface{}, comparison *[]AttributeComparison) ([]interface{}, error) {
+func FilterObjectsByAttributeValues(input interface{}, comparison *[]AttributeComparison) (interface{}, error) {
 	if comparison == nil || len(*comparison) <= 0 {
 		t := reflect.TypeOf(input)
 		if t.Kind() == reflect.Ptr {
