@@ -77,8 +77,8 @@ func ToStringSlice(input []interface{}) []string {
 	return result
 }
 
-// GetValueByName returns a value from a structured type like mape and struct
-func GetValueByName(input interface{}, name string) interface{} {
+// GetValue returns a direct value
+func GetValue(input interface{}) interface{} {
 	var s reflect.Value
 	if reflect.TypeOf(input) == reflect.TypeOf((*reflect.Value)(nil)).Elem() {
 		s = input.(reflect.Value)
@@ -91,6 +91,31 @@ func GetValueByName(input interface{}, name string) interface{} {
 		}
 		s = s.Elem()
 	}
+	if s.Kind() == reflect.Ptr && s.IsNil() {
+		return nil
+	}
+	return s.Interface()
+}
+
+// GetValueByName returns a value from a structured type like mape and struct
+func GetValueByName(input interface{}, name string) interface{} {
+	/*
+		var s reflect.Value
+		if reflect.TypeOf(input) == reflect.TypeOf((*reflect.Value)(nil)).Elem() {
+			s = input.(reflect.Value)
+		} else {
+			s = reflect.ValueOf(input)
+		}
+		if s.Kind() == reflect.Ptr {
+			if s.IsNil() {
+				return nil
+			}
+			s = s.Elem()
+		}
+	*/
+	v := GetValue(input)
+	s := reflect.ValueOf(v)
+
 	if s.Kind() == reflect.Struct {
 		f := s.FieldByName(name)
 		if !f.IsValid() {
@@ -160,7 +185,7 @@ func FilterObjectsByAttributeValues(input interface{}, comparison *[]AttributeCo
 			user := s.Index(i)
 			b := true
 			for _, comp := range *comparison {
-				v := GetValueByName(user, comp.Name)
+				v := GetValue(GetValueByName(user, comp.Name))
 				if v == nil {
 					if comp.AllowNil {
 						continue
@@ -186,7 +211,7 @@ func FilterObjectsByAttributeValues(input interface{}, comparison *[]AttributeCo
 			}
 		}
 	}
-	return output.Interface().([]interface{}), nil
+	return output.Interface(), nil
 }
 
 // ToSHA1Hash returns a SHA1 hash code of a string slice, where the elements are concatenated using '-' as separator at first
