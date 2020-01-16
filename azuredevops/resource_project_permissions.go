@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/ahmetb/go-linq"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform/helper/hashcode"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/identity"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/security"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
@@ -45,11 +45,18 @@ func resourceProjectPermissions() *schema.Resource {
 					Type: schema.TypeString,
 				},
 			},
+			"merge": {
+				Type:     schema.TypeBool,
+				Optional: true,
+				Default:  false,
+			},
 			"permissions": {
 				// Unable to define a validation function, because the
-				// keys and values can only be validated with an initailized
-				// security client, and a validation function in Terraform only
-				// receives the parameter name and the current value as argument
+				// keys and values can only be validated with an initialized
+				// security client as we must load the security namespace
+				// definition and the available permission settings, and a validation
+				// function in Terraform only receives the parameter name and the
+				// current value as argument
 				Type:     schema.TypeMap,
 				Required: true,
 				Elem: &schema.Schema{
@@ -61,8 +68,6 @@ func resourceProjectPermissions() *schema.Resource {
 }
 
 func resourceProjectPermissionsCreate(d *schema.ResourceData, m interface{}) error {
-	time.Sleep(20 * time.Second)
-
 	clients := m.(*config.AggregatedClient)
 	projectID, ok := d.GetOk("project_id")
 	if !ok {
@@ -101,9 +106,8 @@ func resourceProjectPermissionsCreate(d *schema.ResourceData, m interface{}) err
 		func(r interface{}, i interface{}) interface{} {
 			if r.(string) == "" {
 				return i
-			} else {
-				return r.(string) + "," + i.(string)
 			}
+			return r.(string) + "," + i.(string)
 		},
 	)
 	idlist, err := clients.Identity.ReadIdentities(clients.Ctx, identity.ReadIdentitiesArgs{
@@ -140,8 +144,27 @@ func resourceProjectPermissionsCreate(d *schema.ResourceData, m interface{}) err
 		var aceItem *security.AccessControlEntry
 		ace, update := (*(*aclProject)[0].AcesDictionary)[*desc.Descriptor]
 		if !update {
-			// create new ACE for pricipal
 			log.Printf("[TRACE]Creating new ACE for subject [%s]", principal)
+			// Create new ACE for pricipal
+			subjectList, err := clients.GraphClient.LookupSubjects(clients.Ctx, graph.LookupSubjectsArgs{
+				SubjectLookup: &graph.GraphSubjectLookup{
+					LookupKeys: &[]graph.GraphSubjectLookupKey{
+						{
+							Descriptor: desc.SubjectDescriptor,
+						},
+					},
+				},
+			})
+			if err != nil {
+				return err
+			}
+			subject, ok := (*subjectList)[*desc.SubjectDescriptor]
+			if !ok {
+				return fmt.Errorf("Unable to lookup subject data from subject descriptor [%s]", *desc.SubjectDescriptor)
+			}
+			if !strings.EqualFold(*subject.SubjectKind, "group") {
+				return fmt.Errorf("Dedicated user permissions are currently not implemented. Unable to set project permission for account [%s]", *subject.Descriptor)
+			}
 			aceItem = new(security.AccessControlEntry)
 			aceItem.Allow = new(int)
 			aceItem.Deny = new(int)
@@ -182,7 +205,7 @@ func resourceProjectPermissionsCreate(d *schema.ResourceData, m interface{}) err
 
 	aceArr := []security.AccessControlEntry{}
 	linq.From(aceSet.List()).ToSlice(&aceArr)
-	bMerge := true
+	bMerge := d.Get("merge").(bool)
 	container := struct {
 		Token                *string                        `json:"token,omitempty"`
 		Merge                *bool                          `json:"merge,omitempty"`
