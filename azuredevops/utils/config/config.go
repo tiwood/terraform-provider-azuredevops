@@ -34,8 +34,8 @@ type AggregatedClient struct {
 	ServiceEndpointClient         serviceendpoint.Client
 	TaskAgentClient               taskagent.Client
 	MemberEntitleManagementClient memberentitlementmanagement.Client
-	Security                      security.Client
-	Identity                      identity.Client
+	SecurityClient                security.Client
+	IdentityClient                identity.Client
 	Ctx                           context.Context
 }
 
@@ -125,8 +125,8 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		ServiceEndpointClient:         serviceEndpointClient,
 		TaskAgentClient:               taskagentClient,
 		MemberEntitleManagementClient: memberentitlementmanagementClient,
-		Security:                      securityClient,
-		Identity:                      identityClient,
+		SecurityClient:                securityClient,
+		IdentityClient:                identityClient,
 		Ctx:                           ctx,
 	}
 
