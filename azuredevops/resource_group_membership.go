@@ -38,7 +38,6 @@ func resourceGroupMembership() *schema.Resource {
 			},
 			"members": {
 				Type:     schema.TypeSet,
-				MinItems: 1,
 				Required: true,
 				Elem: &schema.Schema{
 					Type:         schema.TypeString,
