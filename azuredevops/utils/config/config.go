@@ -36,6 +36,7 @@ type AggregatedClient struct {
 	MemberEntitleManagementClient memberentitlementmanagement.Client
 	SecurityClient                security.Client
 	IdentityClient                identity.Client
+	GitClient                     git.Client
 	Ctx                           context.Context
 }
 
@@ -116,6 +117,12 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		return nil, err
 	}
 
+	gitClient, err := git.NewClient(ctx, connection)
+	if err != nil {
+		log.Printf("getAzdoClient(): git.NewClient failed.")
+		return nil, err
+	}
+
 	aggregatedClient := &AggregatedClient{
 		CoreClient:                    coreClient,
 		BuildClient:                   buildClient,
@@ -127,6 +134,7 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		MemberEntitleManagementClient: memberentitlementmanagementClient,
 		SecurityClient:                securityClient,
 		IdentityClient:                identityClient,
+		GitClient:                     gitClient,
 		Ctx:                           ctx,
 	}
 
