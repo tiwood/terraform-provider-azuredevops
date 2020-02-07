@@ -97,8 +97,8 @@ resource "azuredevops_serviceendpoint_azurerm" "endpoint1" {
 }
 
 resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
-	project_id             = azuredevops_project.project.id
-	service_endpoint_name  = "Sample Kubernetes"
+  project_id             = azuredevops_project.project.id
+  service_endpoint_name  = "Sample Kubernetes"
   apiserver_url          = "https://sample-kubernetes-cluster.hcp.westeurope.azmk8s.io"
   authorization_type = "AzureSubscription"
   
@@ -113,8 +113,8 @@ resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
 }
 
 resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
-	project_id             = azuredevops_project.project.id
-	service_endpoint_name  = "Sample Kubernetes"
+  project_id             = azuredevops_project.project.id
+  service_endpoint_name  = "Sample Kubernetes"
   apiserver_url          = "https://sample-aks.hcp.westeurope.azmk8s.io"
   authorization_type = "Kubeconfig"
   
@@ -147,8 +147,8 @@ resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
 }
 
 resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
-	project_id             = azuredevops_project.project.id
-	service_endpoint_name  = "Sample Kubernetes"
+  project_id             = azuredevops_project.project.id
+  service_endpoint_name  = "Sample Kubernetes"
   apiserver_url          = "https://sample-kubernetes-cluster.hcp.westeurope.azmk8s.io"
   authorization_type = "ServiceAccount"
   
