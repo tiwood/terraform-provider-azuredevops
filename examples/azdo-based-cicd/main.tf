@@ -158,6 +158,12 @@ resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
   }
 }
 
+resource "azuredevops_resource_authorization" "auth" {
+  project_id = azuredevops_project.project.id
+  resource_id = azuredevops_serviceendpoint_kubernetes.serviceendpoint.id
+  authorized = true
+}
+
 #
 # https://github.com/microsoft/terraform-provider-azuredevops/issues/83
 # resource "azuredevops_policy_build" "p1" {
