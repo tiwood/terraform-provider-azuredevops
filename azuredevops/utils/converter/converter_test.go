@@ -1,4 +1,4 @@
-// +build all helper converter
+// +build all utils converter
 
 package converter
 
@@ -58,4 +58,23 @@ func assertAccountLicenseType(t *testing.T, accountLicenseType licensing.Account
 	actualAccountLicenseType, err := AccountLicenseType(string(accountLicenseType))
 	assert.Nil(t, err, fmt.Sprintf("Error should not thrown by %s", string(accountLicenseType)))
 	assert.Equal(t, &accountLicenseType, actualAccountLicenseType, fmt.Sprintf("%s should be able to convert into the AccountLicenseType", string(accountLicenseType)))
+}
+
+func TestStringFromInterface_StringValue(t *testing.T) {
+	value := "Hello World"
+	valuePtr := StringFromInterface(value)
+	if value != *valuePtr {
+		t.Errorf("The pointer returned references a different value")
+	}
+}
+
+func TestStringFromInterface_InterfaceValue(t *testing.T) {
+	value := "Hello World"
+	var interfaceValue interface{}
+
+	interfaceValue = value
+	valuePtr := StringFromInterface(interfaceValue)
+	if value != *valuePtr {
+		t.Errorf("The pointer returned references a different value")
+	}
 }
