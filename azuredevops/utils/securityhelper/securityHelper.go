@@ -31,7 +31,7 @@ func SetPrincipalPermissions(d *schema.ResourceData, sn *securityNamespace, aclT
 		}
 	}
 	setPermissions := []SetPrincipalPermission{
-		SetPrincipalPermission{
+		{
 			Replace: bReplace.(bool),
 			PrincipalPermission: PrincipalPermission{
 				SubjectDescriptor: principal.(string),
