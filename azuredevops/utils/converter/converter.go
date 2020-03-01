@@ -1,7 +1,12 @@
 package converter
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"strings"
+	"unicode/utf16"
 
 	"github.com/microsoft/azure-devops-go-api/azuredevops/licensing"
 )
@@ -67,4 +72,26 @@ func AccountLicenseType(accountLicenseTypeValue string) (*licensing.AccountLicen
 		return nil, fmt.Errorf("Error unable to match given AccountLicenseType:%s", accountLicenseTypeValue)
 	}
 	return &accountLicenseType, nil
+}
+
+func DecodeUtf16HexString(message string) (string, error) {
+	b, err := hex.DecodeString(message)
+	if err != nil {
+		return "", err
+	}
+	ints := make([]uint16, len(b)/2)
+	if err := binary.Read(bytes.NewReader(b), binary.LittleEndian, &ints); err != nil {
+		return "", err
+	}
+	return string(utf16.Decode(ints)), nil
+}
+
+func EncodeUtf16HexString(message string) (string, error) {
+	runeByte := []rune(message)
+	encodedByte := utf16.Encode(runeByte)
+	var sb strings.Builder
+	for i := 0; i < len(encodedByte); i++ {
+		fmt.Fprintf(&sb, "%02x%02x", encodedByte[i], encodedByte[i]>>8)
+	}
+	return sb.String(), nil
 }
