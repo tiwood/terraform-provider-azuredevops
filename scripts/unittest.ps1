@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 [CmdletBinding()]
 param (
     [Parameter()]
@@ -23,7 +24,8 @@ Push-Location -Path $SOURCE_DIR
 try {
     $argv = @(
         'test',
-        '-v'
+        '-v',
+        '-mod=vendor'
     )
     if ($TestFilter) {
         $argv += @('-run', $TestFilter)

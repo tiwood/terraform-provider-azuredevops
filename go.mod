@@ -5,27 +5,21 @@ go 1.12
 require (
 	cloud.google.com/go v0.51.0 // indirect
 	cloud.google.com/go/storage v1.5.0 // indirect
-	github.com/Azure/go-autorest v10.15.4+incompatible // indirect
 	github.com/ahmetb/go-linq v3.0.0+incompatible
 	github.com/aws/aws-sdk-go v1.27.4 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/golang/mock v1.3.1
 	github.com/google/go-cmp v0.4.0 // indirect
-	github.com/google/martian v2.1.0+incompatible
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/go-hclog v0.10.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.6.4 // indirect
 	github.com/hashicorp/go-uuid v1.0.2
-	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/hashicorp/hcl/v2 v2.3.0 // indirect
-	github.com/hashicorp/hcl2 v0.0.0-20191002203319-fb75b3253c80 // indirect
-	github.com/hashicorp/hil v0.0.0-20190212132231-97b3a9cdfa93 // indirect
 	github.com/hashicorp/terraform v0.12.19
 	github.com/hashicorp/terraform-plugin-sdk v1.4.1
 	github.com/hashicorp/terraform-svchost v0.0.0-20191119180714-d2e4933b9136 // indirect
 	github.com/hashicorp/yamux v0.0.0-20190923154419-df201c70410d // indirect
-	github.com/marstr/guid v1.1.0 // indirect
 	github.com/microsoft/azure-devops-go-api/azuredevops v0.0.0-20191230214132-3cd87c562d09
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/posener/complete v1.2.3 // indirect

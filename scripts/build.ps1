@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 [CmdletBinding()]
 param (
     [switch]
@@ -44,7 +45,8 @@ function compile() {
         $argv = @(
             'build',
             '-o',
-            "$BUILD_DIR/$BUILD_ARTIFACT"
+            "$BUILD_DIR/$BUILD_ARTIFACT",
+            '-mod=vendor'
         )
         if ($DebugBuild) {
             $argv += @( '-gcflags="all=-N -l"' )

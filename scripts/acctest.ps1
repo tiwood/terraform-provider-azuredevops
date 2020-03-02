@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 [CmdletBinding()]
 param (
     [Parameter()]
@@ -34,7 +35,8 @@ try {
     $env:TF_ACC=1
     $argv = @(
         'test',
-        '-v'
+        '-v',
+        '-mod=vendor'
     )
     if ($TestFilter) {
         $argv += @('-run', $TestFilter)
