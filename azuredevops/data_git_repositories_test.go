@@ -80,10 +80,10 @@ func TestReposDataSource_ListRepos(t *testing.T) {
 		GetRepositories(clients.ctx, expectedArgs).
 		Return(&gitReposResult, nil)
 
-	resourceData := schema.TestResourceDataRaw(t, resourceAzureGitRepository().Schema, nil)
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
 	resourceData.Set("project_id", projectName)
 
-	repos, err := resourceAzureGitRepositoriesRead(resourceData, clients)
+	repos, err := resourceGitRepositoriesRead(resourceData, clients)
 	require.Nil(t, err)
 	require.Equal(t, repoName, *(*repos)[0].Name)
 }

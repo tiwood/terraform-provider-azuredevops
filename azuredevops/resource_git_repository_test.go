@@ -50,7 +50,7 @@ func TestAzureGitRepo_Create_DoesNotSwallowErrorFromFailedCreateCall(t *testing.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	resourceData := schema.TestResourceDataRaw(t, resourceAzureGitRepository().Schema, nil)
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
 	flattenAzureGitRepository(resourceData, &testAzureGitRepository)
 	configureCleanInitialization(resourceData)
 
@@ -71,7 +71,7 @@ func TestAzureGitRepo_Create_DoesNotSwallowErrorFromFailedCreateCall(t *testing.
 		Return(nil, errors.New("CreateAzureGitRepository() Failed")).
 		Times(1)
 
-	err := resourceAzureGitRepositoryCreate(resourceData, clients)
+	err := resourceGitRepositoryCreate(resourceData, clients)
 	require.Regexp(t, ".*CreateAzureGitRepository\\(\\) Failed$", err.Error())
 }
 
@@ -81,7 +81,7 @@ func TestAzureGitRepo_Update_DoesNotSwallowErrorFromFailedCreateCall(t *testing.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	resourceData := schema.TestResourceDataRaw(t, resourceAzureGitRepository().Schema, nil)
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
 	flattenAzureGitRepository(resourceData, &testAzureGitRepository)
 	configureCleanInitialization(resourceData)
 
@@ -94,7 +94,7 @@ func TestAzureGitRepo_Update_DoesNotSwallowErrorFromFailedCreateCall(t *testing.
 		Return(nil, errors.New("UpdateAzureGitRepository() Failed")).
 		Times(1)
 
-	err := resourceAzureGitRepositoryUpdate(resourceData, clients)
+	err := resourceGitRepositoryUpdate(resourceData, clients)
 	require.Regexp(t, ".*UpdateAzureGitRepository\\(\\) Failed$", err.Error())
 }
 
@@ -116,7 +116,7 @@ func TestAzureGitRepo_FlattenExpand_RoundTrip(t *testing.T) {
 	repoName := "name"
 	gitRepo := git.GitRepository{Id: &repoID, Name: &repoName, Project: &project}
 
-	resourceData := schema.TestResourceDataRaw(t, resourceAzureGitRepository().Schema, nil)
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
 	flattenAzureGitRepository(resourceData, &gitRepo)
 	configureCleanInitialization(resourceData)
 
@@ -142,7 +142,7 @@ func TestAzureGitRepo_Read_DoesNotSwallowErrorFromFailedReadCall(t *testing.T) {
 		Ctx:            context.Background(),
 	}
 
-	resourceData := schema.TestResourceDataRaw(t, resourceAzureGitRepository().Schema, nil)
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
 	resourceData.SetId("an-id")
 	resourceData.Set("project_id", "a-project")
 
@@ -153,7 +153,7 @@ func TestAzureGitRepo_Read_DoesNotSwallowErrorFromFailedReadCall(t *testing.T) {
 		Return(nil, fmt.Errorf("GetRepository() Failed")).
 		Times(1)
 
-	err := resourceAzureGitRepositoryRead(resourceData, clients)
+	err := resourceGitRepositoryRead(resourceData, clients)
 	require.Contains(t, err.Error(), "GetRepository() Failed")
 }
 
@@ -168,7 +168,7 @@ func TestAzureGitRepo_Read_UsesIdIfSet(t *testing.T) {
 		Ctx:            context.Background(),
 	}
 
-	resourceData := schema.TestResourceDataRaw(t, resourceAzureGitRepository().Schema, nil)
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
 	resourceData.SetId("an-id")
 	resourceData.Set("project_id", "a-project")
 
@@ -179,14 +179,14 @@ func TestAzureGitRepo_Read_UsesIdIfSet(t *testing.T) {
 		Return(nil, fmt.Errorf("error")).
 		Times(1)
 
-	resourceAzureGitRepositoryRead(resourceData, clients)
+	resourceGitRepositoryRead(resourceData, clients)
 }
 
 func TestAzureGitRepo_Delete_ChecksForValidUUID(t *testing.T) {
-	resourceData := schema.TestResourceDataRaw(t, resourceAzureGitRepository().Schema, nil)
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
 	resourceData.SetId("not-a-uuid-id")
 
-	err := resourceAzureGitRepositoryDelete(resourceData, &config.AggregatedClient{})
+	err := resourceGitRepositoryDelete(resourceData, &config.AggregatedClient{})
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "Invalid repositoryId UUID")
 }
@@ -201,7 +201,7 @@ func TestAzureGitRepo_Delete_DoesNotSwallowErrorFromFailedDeleteCall(t *testing.
 		Ctx:            context.Background(),
 	}
 
-	resourceData := schema.TestResourceDataRaw(t, resourceAzureGitRepository().Schema, nil)
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
 	id := uuid.New()
 	resourceData.SetId(id.String())
 
@@ -212,7 +212,7 @@ func TestAzureGitRepo_Delete_DoesNotSwallowErrorFromFailedDeleteCall(t *testing.
 		Return(fmt.Errorf("DeleteRepository() Failed")).
 		Times(1)
 
-	err := resourceAzureGitRepositoryDelete(resourceData, clients)
+	err := resourceGitRepositoryDelete(resourceData, clients)
 	require.Contains(t, err.Error(), "DeleteRepository() Failed")
 }
 
@@ -227,7 +227,7 @@ func TestAzureGitRepo_Read_UsesNameIfIdNotSet(t *testing.T) {
 		Ctx:            context.Background(),
 	}
 
-	resourceData := schema.TestResourceDataRaw(t, resourceAzureGitRepository().Schema, nil)
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
 	resourceData.Set("name", "a-name")
 	resourceData.Set("project_id", "a-project")
 
@@ -238,7 +238,7 @@ func TestAzureGitRepo_Read_UsesNameIfIdNotSet(t *testing.T) {
 		Return(nil, fmt.Errorf("error")).
 		Times(1)
 
-	resourceAzureGitRepositoryRead(resourceData, clients)
+	resourceGitRepositoryRead(resourceData, clients)
 }
 
 /**
@@ -308,7 +308,7 @@ func testAccCheckAzureGitRepoResourceExists(expectedName string) resource.TestCh
 		repoID := gitRepo.Primary.ID
 		projectID := gitRepo.Primary.Attributes["project_id"]
 
-		repo, err := azureGitRepositoryRead(clients, repoID, "", projectID)
+		repo, err := gitRepositoryRead(clients, repoID, "", projectID)
 		if err != nil {
 			return err
 		}
@@ -334,7 +334,7 @@ func testAccAzureGitRepoCheckDestroy(s *terraform.State) error {
 		projectID := resource.Primary.Attributes["project_id"]
 
 		// indicates the git repository still exists - this should fail the test
-		if _, err := azureGitRepositoryRead(clients, repoID, "", projectID); err == nil {
+		if _, err := gitRepositoryRead(clients, repoID, "", projectID); err == nil {
 			return fmt.Errorf("repository with ID %s should not exist", repoID)
 		}
 	}
