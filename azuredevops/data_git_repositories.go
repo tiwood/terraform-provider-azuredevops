@@ -26,7 +26,7 @@ func dataGitRepositories() *schema.Resource {
 				ValidateFunc:     validate.UUID,
 				DiffSuppressFunc: suppress.CaseDifference,
 			},
-			"repository_name": {
+			"name": {
 				Type:             schema.TypeString,
 				Optional:         true,
 				ValidateFunc:     validate.NoEmptyStrings,
@@ -155,11 +155,11 @@ func flattenGitRepositories(repos *[]git.GitRepository) ([]interface{}, error) {
 		}
 
 		if element.Project != nil && element.Project.Id != nil {
-			output["project_id"] = *element.Project.Id
+			output["project_id"] = element.Project.Id.String()
 		}
 
 		if element.Size != nil {
-			output["project_id"] = *element.Size
+			output["size"] = *element.Size
 		}
 
 		results = append(results, output)
