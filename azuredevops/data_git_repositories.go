@@ -88,12 +88,10 @@ func getGitRepositoryHash(v interface{}) int {
 
 func dataSourceGitRepositoriesRead(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
-	repoName, projectID := d.Get("name").(string), d.Get("project_id").(string)
-	includeHidden := d.Get("include_hidden").(bool)
 
-	projectRepos, err := getGitRepositoriesByNameAndProject(clients, repoName, projectID, includeHidden)
+	projectRepos, err := getGitRepositoriesByNameAndProject(d, clients)
 	if err != nil {
-		return fmt.Errorf("Error finding repos for project with ID %s. Error: %v", projectID, err)
+		return fmt.Errorf("Error finding repositories. Error: %v", err)
 	}
 	log.Printf("[TRACE] plugin.terraform-provider-azuredevops: Read [%d] Git repositories", len(*projectRepos))
 
@@ -102,23 +100,42 @@ func dataSourceGitRepositoriesRead(d *schema.ResourceData, m interface{}) error 
 		return fmt.Errorf("Error flattening projects. Error: %v", err)
 	}
 
-	h := sha1.New()
 	repoNames, err := getAttributeValues(results, "name")
 	if err != nil {
 		return fmt.Errorf("Failed to get list of repository names: %v", err)
 	}
-	if len(repoNames) <= 0 && repoName != "" {
-		repoNames = append(repoNames, repoName)
-	}
-	if _, err := h.Write([]byte(strings.Join(repoNames, "-"))); err != nil {
-		return fmt.Errorf("Unable to compute hash for Git repository names: %v", err)
-	}
-	d.SetId("gitRepos#" + base64.URLEncoding.EncodeToString(h.Sum(nil)))
-	err = d.Set("repositories", results)
+	id, err := createGitRepositoryDataSourceID(d, &repoNames)
 	if err != nil {
 		return err
 	}
+	d.SetId(id)
+	err = d.Set("repositories", results)
+	if err != nil {
+		d.SetId("")
+		return err
+	}
 	return nil
+}
+
+func createGitRepositoryDataSourceID(d *schema.ResourceData, repoNames *[]string) (string, error) {
+	h := sha1.New()
+	var names []string
+	if nil == repoNames {
+		names = []string{}
+	} else {
+		names = *repoNames
+	}
+	if len(names) <= 0 {
+		names = append(names, "empty")
+	}
+	projectID := d.Get("project_id").(string)
+	if projectID != "" {
+		names = append([]string{projectID}, names...)
+	}
+	if _, err := h.Write([]byte(strings.Join(names, "-"))); err != nil {
+		return "", fmt.Errorf("Unable to compute hash for Git repository names: %v", err)
+	}
+	return "gitRepos#" + base64.URLEncoding.EncodeToString(h.Sum(nil)), nil
 }
 
 func flattenGitRepositories(repos *[]git.GitRepository) ([]interface{}, error) {
@@ -168,9 +185,12 @@ func flattenGitRepositories(repos *[]git.GitRepository) ([]interface{}, error) {
 	return results, nil
 }
 
-func getGitRepositoriesByNameAndProject(clients *config.AggregatedClient, name string, projectID string, includeHidden bool) (*[]git.GitRepository, error) {
+func getGitRepositoriesByNameAndProject(d *schema.ResourceData, clients *config.AggregatedClient) (*[]git.GitRepository, error) {
 	var repos *[]git.GitRepository
 	var err error
+	name, projectID := d.Get("name").(string), d.Get("project_id").(string)
+	includeHidden := d.Get("include_hidden").(bool)
+
 	if name != "" && projectID != "" {
 		repo, err := gitRepositoryRead(clients, "", name, projectID)
 		if err != nil {
