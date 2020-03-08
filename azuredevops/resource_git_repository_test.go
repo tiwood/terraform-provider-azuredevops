@@ -51,7 +51,8 @@ func TestAzureGitRepo_Create_DoesNotSwallowErrorFromFailedCreateCall(t *testing.
 	defer ctrl.Finish()
 
 	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
-	flattenAzureGitRepository(resourceData, &testAzureGitRepository)
+	resourceData.SetId(testAzureGitRepository.Id.String())
+	flattenGitRepository(resourceData, &testAzureGitRepository)
 	configureCleanInitialization(resourceData)
 
 	reposClient := azdosdkmocks.NewMockGitClient(ctrl)
@@ -82,7 +83,8 @@ func TestAzureGitRepo_Update_DoesNotSwallowErrorFromFailedCreateCall(t *testing.
 	defer ctrl.Finish()
 
 	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
-	flattenAzureGitRepository(resourceData, &testAzureGitRepository)
+	resourceData.SetId(testAzureGitRepository.Id.String())
+	flattenGitRepository(resourceData, &testAzureGitRepository)
 	configureCleanInitialization(resourceData)
 
 	reposClient := azdosdkmocks.NewMockGitClient(ctrl)
@@ -117,14 +119,42 @@ func TestAzureGitRepo_FlattenExpand_RoundTrip(t *testing.T) {
 	gitRepo := git.GitRepository{Id: &repoID, Name: &repoName, Project: &project}
 
 	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
-	flattenAzureGitRepository(resourceData, &gitRepo)
-	configureCleanInitialization(resourceData)
+	resourceData.SetId(gitRepo.Id.String())
+	flattenGitRepository(resourceData, &gitRepo)
 
-	expandedGitRepo, repoInitialization, expandedProjectID, err := expandAzureGitRepository(resourceData)
+	expandedGitRepo, repoInitialization, expandedProjectID, err := expandGitRepository(resourceData)
 
 	require.Nil(t, err)
+	require.NotNil(t, expandedGitRepo)
+	require.NotNil(t, expandedGitRepo.Id)
 	require.Equal(t, *expandedGitRepo.Id, repoID)
+	require.NotNil(t, expandedProjectID)
 	require.Equal(t, *expandedProjectID, projectID)
+	require.Nil(t, repoInitialization)
+}
+
+func TestAzureGitRepo_FlattenExpandInitialization_RoundTrip(t *testing.T) {
+	projectID := uuid.New()
+	project := core.TeamProjectReference{Id: &projectID}
+
+	repoID := uuid.New()
+	repoName := "name"
+	gitRepo := git.GitRepository{Id: &repoID, Name: &repoName, Project: &project}
+
+	resourceData := schema.TestResourceDataRaw(t, resourceGitRepository().Schema, nil)
+	resourceData.SetId(gitRepo.Id.String())
+	flattenGitRepository(resourceData, &gitRepo)
+	configureCleanInitialization(resourceData)
+
+	expandedGitRepo, repoInitialization, expandedProjectID, err := expandGitRepository(resourceData)
+
+	require.Nil(t, err)
+	require.NotNil(t, expandedGitRepo)
+	require.NotNil(t, expandedGitRepo.Id)
+	require.Equal(t, *expandedGitRepo.Id, repoID)
+	require.NotNil(t, expandedProjectID)
+	require.Equal(t, *expandedProjectID, projectID)
+	require.NotNil(t, repoInitialization)
 	require.Equal(t, repoInitialization.initType, "Clean")
 	require.Equal(t, repoInitialization.sourceType, "")
 	require.Equal(t, repoInitialization.sourceURL, "")
@@ -255,7 +285,7 @@ func TestAccAzureGitRepo_CreateAndUpdate(t *testing.T) {
 	projectName := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	gitRepoNameFirst := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	gitRepoNameSecond := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	tfRepoNode := "azuredevops_azure_git_repository.gitrepo"
+	tfRepoNode := "azuredevops_git_repository.gitrepo"
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testhelper.TestAccPreCheck(t, nil) },
@@ -300,7 +330,7 @@ func testAccCheckAzureGitRepoResourceExists(expectedName string) resource.TestCh
 	return func(s *terraform.State) error {
 		clients := testAccProvider.Meta().(*config.AggregatedClient)
 
-		gitRepo, ok := s.RootModule().Resources["azuredevops_azure_git_repository.gitrepo"]
+		gitRepo, ok := s.RootModule().Resources["azuredevops_git_repository.gitrepo"]
 		if !ok {
 			return fmt.Errorf("Did not find a repo definition in the TF state")
 		}
@@ -326,7 +356,7 @@ func testAccAzureGitRepoCheckDestroy(s *terraform.State) error {
 
 	// verify that every repository referenced in the state does not exist in AzDO
 	for _, resource := range s.RootModule().Resources {
-		if resource.Type != "azuredevops_azure_git_repository" {
+		if resource.Type != "azuredevops_git_repository" {
 			continue
 		}
 
@@ -347,7 +377,7 @@ func testAccAzureGitRepoCheckDestroy(s *terraform.State) error {
 func TestAccAzureGitRepo_RepoInitialization_Clean(t *testing.T) {
 	projectName := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	gitRepoName := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	tfRepoNode := "azuredevops_azure_git_repository.gitrepo"
+	tfRepoNode := "azuredevops_git_repository.gitrepo"
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testhelper.TestAccPreCheck(t, nil) },
@@ -372,7 +402,7 @@ func TestAccAzureGitRepo_RepoInitialization_Clean(t *testing.T) {
 func TestAccAzureGitRepo_RepoInitialization_Uninitialized(t *testing.T) {
 	projectName := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	gitRepoName := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	tfRepoNode := "azuredevops_azure_git_repository.gitrepo"
+	tfRepoNode := "azuredevops_git_repository.gitrepo"
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testhelper.TestAccPreCheck(t, nil) },

@@ -2,6 +2,7 @@ package azuredevops
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -11,6 +12,7 @@ import (
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/suppress"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/validate"
 )
 
 func resourceGitRepository() *schema.Resource {
@@ -24,6 +26,7 @@ func resourceGitRepository() *schema.Resource {
 			"project_id": {
 				Type:             schema.TypeString,
 				Required:         true,
+				ForceNew:         true, // repositories cannot be moved
 				ValidateFunc:     validation.NoZeroValues,
 				DiffSuppressFunc: suppress.CaseDifference,
 			},
@@ -34,9 +37,17 @@ func resourceGitRepository() *schema.Resource {
 				ValidateFunc:     validation.NoZeroValues,
 				DiffSuppressFunc: suppress.CaseDifference,
 			},
+			"parent_repository_id": {
+				Type:             schema.TypeString,
+				Optional:         true,
+				ValidateFunc:     validate.UUID,
+				DiffSuppressFunc: suppress.CaseDifference,
+			},
 			"default_branch": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:         schema.TypeString,
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validation.NoZeroValues,
 			},
 			"is_fork": {
 				Type:     schema.TypeBool,
@@ -64,15 +75,14 @@ func resourceGitRepository() *schema.Resource {
 			},
 			"initialization": {
 				Type:     schema.TypeSet,
-				Required: true,
-				MinItems: 1,
+				Optional: true,
 				MaxItems: 1,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"init_type": {
 							Type:         schema.TypeString,
 							Required:     true,
-							ValidateFunc: validation.StringInSlice([]string{"Uninitialized", "Clean", "Fork", "Import"}, false),
+							ValidateFunc: validation.StringInSlice([]string{"uninitialized", "clean", "import"}, true),
 						},
 						"source_type": {
 							Type:     schema.TypeString,
@@ -105,14 +115,30 @@ func resourceGitRepositoryCreate(d *schema.ResourceData, m interface{}) error {
 		return fmt.Errorf("Error expanding repository resource data: %+v", err)
 	}
 
-	createdRepo, err := createGitRepository(clients, repo.Name, projectID)
+	var parentRepoRef *git.GitRepositoryRef = nil
+	if parentRepoID, ok := d.GetOkExists("parent_repository_id"); ok {
+		parentRepo, err := gitRepositoryRead(clients, parentRepoID.(string), "", "")
+		if err != nil {
+			return fmt.Errorf("Failed to locate parent repository [%s]: %+v", parentRepoID, err)
+		}
+		parentRepoRef = &git.GitRepositoryRef{
+			Id:      parentRepo.Id,
+			Name:    parentRepo.Name,
+			Project: parentRepo.Project,
+		}
+	}
+
+	createdRepo, err := createGitRepository(clients, repo.Name, projectID, parentRepoRef)
 	if err != nil {
 		return fmt.Errorf("Error creating repository in Azure DevOps: %+v", err)
 	}
 
-	if initialization.initType == "Clean" {
+	if initialization != nil && initialization.initType == "Clean" {
 		err = initializeGitRepository(clients, createdRepo)
 		if err != nil {
+			if err := deleteGitRepository(clients, createdRepo.Id.String()); err != nil {
+				log.Printf("[WARN] Unable to delete new Git Repository after initialization failed: %+v", err)
+			}
 			return fmt.Errorf("Error initializing repository in Azure DevOps: %+v", err)
 		}
 	}
@@ -121,13 +147,14 @@ func resourceGitRepositoryCreate(d *schema.ResourceData, m interface{}) error {
 	return resourceGitRepositoryRead(d, m)
 }
 
-func createGitRepository(clients *config.AggregatedClient, repoName *string, projectID *uuid.UUID) (*git.GitRepository, error) {
+func createGitRepository(clients *config.AggregatedClient, repoName *string, projectID *uuid.UUID, parentRepo *git.GitRepositoryRef) (*git.GitRepository, error) {
 	args := git.CreateRepositoryArgs{
 		GitRepositoryToCreate: &git.GitRepositoryCreateOptions{
 			Name: repoName,
 			Project: &core.TeamProjectReference{
 				Id: projectID,
 			},
+			ParentRepository: parentRepo,
 		},
 	}
 	createdRepository, err := clients.GitReposClient.CreateRepository(clients.Ctx, args)
@@ -201,11 +228,13 @@ func resourceGitRepositoryUpdate(d *schema.ResourceData, m interface{}) error {
 		return fmt.Errorf("Error updating repository in Azure DevOps: %+v", err)
 	}
 
-	flattenGitRepository(d, repo)
 	return resourceGitRepositoryRead(d, m)
 }
 
 func updateGitRepository(clients *config.AggregatedClient, repository *git.GitRepository, project *uuid.UUID) (*git.GitRepository, error) {
+	if nil == project {
+		return nil, fmt.Errorf("updateGitRepository: ID of project cannot be nil")
+	}
 	projectID := project.String()
 	return clients.GitReposClient.UpdateRepository(
 		clients.Ctx,
@@ -219,7 +248,12 @@ func updateGitRepository(clients *config.AggregatedClient, repository *git.GitRe
 func resourceGitRepositoryDelete(d *schema.ResourceData, m interface{}) error {
 	repoID := d.Id()
 	clients := m.(*config.AggregatedClient)
-	return deleteGitRepository(clients, repoID)
+	err := deleteGitRepository(clients, repoID)
+	if err != nil {
+		return err
+	}
+	d.SetId("")
+	return nil
 }
 
 func deleteGitRepository(clients *config.AggregatedClient, repoID string) error {
@@ -263,9 +297,14 @@ func flattenGitRepository(d *schema.ResourceData, repository *git.GitRepository)
 func expandGitRepository(d *schema.ResourceData) (*git.GitRepository, *repoInitializationMeta, *uuid.UUID, error) {
 	// an "error" is OK here as it is expected in the case that the ID is not set in the resource data
 	var repoID *uuid.UUID
-	parsedID, err := uuid.Parse(d.Id())
-	if err == nil {
-		repoID = &parsedID
+	id := d.Id()
+	if id == "" {
+		log.Print("[DEBUG] expandGitRepository: ID is empty (not set)")
+	} else {
+		parsedID, err := uuid.Parse(id)
+		if err == nil {
+			repoID = &parsedID
+		}
 	}
 
 	projectID, err := uuid.Parse(d.Get("project_id").(string))
@@ -274,32 +313,34 @@ func expandGitRepository(d *schema.ResourceData) (*git.GitRepository, *repoIniti
 	}
 
 	repo := &git.GitRepository{
-		Id:   repoID,
-		Name: converter.String(d.Get("name").(string)),
+		Id:            repoID,
+		Name:          converter.String(d.Get("name").(string)),
+		DefaultBranch: converter.String(d.Get("default_branch").(string)),
 	}
 
+	var initialization *repoInitializationMeta = nil
 	initData := d.Get("initialization").(*schema.Set).List()
 
 	// Note: If configured, this will be of length 1 based on the schema definition above.
-	if len(initData) != 1 {
-		return nil, nil, nil, fmt.Errorf("Unexpectedly did not find repository initialization metadata in the resource data")
-	}
+	if len(initData) == 1 {
+		initValues := initData[0].(map[string]interface{})
 
-	initValues := initData[0].(map[string]interface{})
+		initialization = &repoInitializationMeta{
+			initType:   initValues["init_type"].(string),
+			sourceType: initValues["source_type"].(string),
+			sourceURL:  initValues["source_url"].(string),
+		}
 
-	initialization := &repoInitializationMeta{
-		initType:   initValues["init_type"].(string),
-		sourceType: initValues["source_type"].(string),
-		sourceURL:  initValues["source_url"].(string),
-	}
+		if initialization.initType == "Import" {
+			return nil, nil, nil, fmt.Errorf("Initialization strategy not implemented: %s", initialization.initType)
+		}
 
-	if initialization.initType == "Fork" || initialization.initType == "Import" {
-		return nil, nil, nil, fmt.Errorf("Initialization strategy not implemented: %s", initialization.initType)
-	}
-
-	if initialization.initType == "Clean" {
-		initialization.sourceType = ""
-		initialization.sourceURL = ""
+		if initialization.initType == "Clean" {
+			initialization.sourceType = ""
+			initialization.sourceURL = ""
+		}
+	} else if len(initData) > 1 {
+		return nil, nil, nil, fmt.Errorf("Multiple initialization blocks")
 	}
 
 	return repo, initialization, &projectID, nil
