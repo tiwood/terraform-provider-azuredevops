@@ -10,26 +10,15 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"regexp"
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/hashicorp/go-retryablehttp"
-)
-
-var (
-	defaultRetryWaitMin = 1 * time.Second
-	defaultRetryWaitMax = 30 * time.Second
-	defaultRetryMax     = 4
-	defaultLogger       = log.New(os.Stderr, "", log.LstdFlags)
 )
 
 const (
@@ -58,32 +47,10 @@ var apiResourceLocationCacheLock = sync.RWMutex{}
 // Base user agent string.  The UserAgent set on the connection will be appended to this.
 var baseUserAgent = "go/" + runtime.Version() + " (" + runtime.GOOS + " " + runtime.GOARCH + ") azure-devops-go-api/0.0.0" // todo: get real version
 
-type ClientSettings struct {
-	RetryWaitMin time.Duration // Minimum time to wait
-	RetryWaitMax time.Duration // Maximum time to wait
-	RetryMax     int           // Maximum number of retries
-	Logger       *log.Logger   // Custom logger instance
-}
-
 func NewClient(connection *Connection, baseUrl string) *Client {
-	return NewClientWithSettings(connection, baseUrl, &ClientSettings{
-		RetryWaitMin: defaultRetryWaitMin,
-		RetryWaitMax: defaultRetryWaitMax,
-		RetryMax:     defaultRetryMax,
-		Logger:       defaultLogger,
-	})
-}
-
-func NewClientWithSettings(connection *Connection, baseUrl string, settings *ClientSettings) *Client {
-	client := retryablehttp.NewClient()
-	if settings.Logger != nil {
-		settings.Logger = defaultLogger
-	}
-	if settings != nil {
-		client.RetryWaitMin = settings.RetryWaitMin
-		client.RetryWaitMax = settings.RetryWaitMax
-		client.RetryMax = settings.RetryMax
-		client.Logger = settings.Logger
+	client := &http.Client{}
+	if connection.Timeout != nil {
+		client.Timeout = *connection.Timeout
 	}
 	return &Client{
 		baseUrl:                 baseUrl,
@@ -92,34 +59,24 @@ func NewClientWithSettings(connection *Connection, baseUrl string, settings *Cli
 		suppressFedAuthRedirect: connection.SuppressFedAuthRedirect,
 		forceMsaPassThrough:     connection.ForceMsaPassThrough,
 		userAgent:               connection.UserAgent,
-		logger:                  settings.Logger,
 	}
 }
 
 type Client struct {
 	baseUrl                 string
-	client                  *retryablehttp.Client
+	client                  *http.Client
 	authorization           string
 	suppressFedAuthRedirect bool
 	forceMsaPassThrough     bool
 	userAgent               string
-	logger                  *log.Logger
 }
 
 func (client *Client) SendRequest(request *http.Request) (response *http.Response, err error) {
-	rtreq, err := retryablehttp.FromRequest(request)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := client.client.Do(rtreq)
+	resp, err := client.client.Do(request) // todo: add retry logic
 	if resp != nil && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
 		err = client.UnwrapError(resp)
 	}
 	return resp, err
-}
-
-func (client *Client) GetLogger() *log.Logger {
-	return client.logger
 }
 
 func (client *Client) Send(ctx context.Context,
@@ -358,9 +315,6 @@ func (client *Client) UnmarshalCollectionBody(response *http.Response, v interfa
 
 		body = trimByteOrderMark(body)
 		err = client.UnmarshalCollectionJson(body, v)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

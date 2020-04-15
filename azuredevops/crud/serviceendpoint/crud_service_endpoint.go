@@ -13,7 +13,7 @@ import (
 )
 
 type flatFunc func(d *schema.ResourceData, serviceEndpoint *serviceendpoint.ServiceEndpoint, projectID *string)
-type expandFunc func(d *schema.ResourceData) (*serviceendpoint.ServiceEndpoint, *string)
+type expandFunc func(d *schema.ResourceData) (*serviceendpoint.ServiceEndpoint, *string, error)
 type importFunc func(clients *config.AggregatedClient, id string) (string, string, error)
 
 //GenBaseServiceEndpointResource creates a Resource with the common parts
@@ -175,7 +175,10 @@ func updateServiceEndpoint(clients *config.AggregatedClient, endpoint *serviceen
 func genServiceEndpointCreateFunc(flatFunc flatFunc, expandFunc expandFunc) func(d *schema.ResourceData, m interface{}) error {
 	return func(d *schema.ResourceData, m interface{}) error {
 		clients := m.(*config.AggregatedClient)
-		serviceEndpoint, projectID := expandFunc(d)
+		serviceEndpoint, projectID, err := expandFunc(d)
+		if err != nil {
+			return fmt.Errorf("Error reading terraform configuration: %+v", err)
+		}
 
 		createdServiceEndpoint, err := createServiceEndpoint(clients, serviceEndpoint, projectID)
 		if err != nil {
@@ -210,7 +213,12 @@ func genServiceEndpointReadFunc(flatFunc flatFunc) func(d *schema.ResourceData, 
 			return fmt.Errorf("Error looking up service endpoint given ID (%v) and project ID (%v): %v", serviceEndpointID, projectID, err)
 		}
 
-		flatFunc(d, serviceEndpoint, projectID)
+		if serviceEndpoint.Id == nil {
+			// e.g. service endpoint has been deleted separately without TF
+			d.SetId("")
+		} else {
+			flatFunc(d, serviceEndpoint, projectID)
+		}
 		return nil
 	}
 }
@@ -218,7 +226,10 @@ func genServiceEndpointReadFunc(flatFunc flatFunc) func(d *schema.ResourceData, 
 func genServiceEndpointUpdateFunc(flatFunc flatFunc, expandFunc expandFunc) schema.UpdateFunc {
 	return func(d *schema.ResourceData, m interface{}) error {
 		clients := m.(*config.AggregatedClient)
-		serviceEndpoint, projectID := expandFunc(d)
+		serviceEndpoint, projectID, err := expandFunc(d)
+		if err != nil {
+			return fmt.Errorf("Error reading terraform configuration: %+v", err)
+		}
 
 		updatedServiceEndpoint, err := updateServiceEndpoint(clients, serviceEndpoint, projectID)
 		if err != nil {
@@ -233,7 +244,10 @@ func genServiceEndpointUpdateFunc(flatFunc flatFunc, expandFunc expandFunc) sche
 func genServiceEndpointDeleteFunc(expandFunc expandFunc) schema.DeleteFunc {
 	return func(d *schema.ResourceData, m interface{}) error {
 		clients := m.(*config.AggregatedClient)
-		serviceEndpoint, projectID := expandFunc(d)
+		serviceEndpoint, projectID, err := expandFunc(d)
+		if err != nil {
+			return fmt.Errorf("Error reading terraform configuration: %+v", err)
+		}
 
 		return deleteServiceEndpoint(clients, projectID, serviceEndpoint.Id)
 	}
