@@ -51,11 +51,13 @@ func ToBool(value *bool, defaultValue bool) bool {
 // AccountLicenseType Get a pointer to an AccountLicenseType
 func AccountLicenseType(accountLicenseTypeValue string) (*licensing.AccountLicenseType, error) {
 	var accountLicenseType licensing.AccountLicenseType
-	switch accountLicenseTypeValue {
+	switch strings.ToLower(accountLicenseTypeValue) {
 	case "none":
 		accountLicenseType = licensing.AccountLicenseTypeValues.None
-	case "earlyAdopter":
+	case "earlyadopter":
 		accountLicenseType = licensing.AccountLicenseTypeValues.EarlyAdopter
+	case "basic":
+		fallthrough
 	case "express":
 		accountLicenseType = licensing.AccountLicenseTypeValues.Express
 	case "professional":
@@ -68,4 +70,26 @@ func AccountLicenseType(accountLicenseTypeValue string) (*licensing.AccountLicen
 		return nil, fmt.Errorf("Error unable to match given AccountLicenseType:%s", accountLicenseTypeValue)
 	}
 	return &accountLicenseType, nil
+}
+
+// AccountLicensingSource convert a string value to a licensing.AccountLicenseType pointer
+func AccountLicensingSource(licensingSourceValue string) (*licensing.LicensingSource, error) {
+	var licensingSource licensing.LicensingSource
+	switch strings.ToLower(licensingSourceValue) {
+	case "none":
+		licensingSource = licensing.LicensingSourceValues.None
+	case "account":
+		licensingSource = licensing.LicensingSourceValues.Account
+	case "msdn":
+		licensingSource = licensing.LicensingSourceValues.Msdn
+	case "profile":
+		licensingSource = licensing.LicensingSourceValues.Profile
+	case "auto":
+		licensingSource = licensing.LicensingSourceValues.Auto
+	case "trial":
+		licensingSource = licensing.LicensingSourceValues.Trial
+	default:
+		return nil, fmt.Errorf("Error unable to match given LicensingSource :%s", licensingSourceValue)
+	}
+	return &licensingSource, nil
 }
