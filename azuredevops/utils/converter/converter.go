@@ -1,8 +1,12 @@
 package converter
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/microsoft/azure-devops-go-api/azuredevops/licensing"
 )
@@ -13,6 +17,11 @@ func String(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+// StringFromInterface get a string pointer from an interface
+func StringFromInterface(value interface{}) *string {
+	return String(value.(string))
 }
 
 // Bool Get a pointer to a boolean value
@@ -92,4 +101,26 @@ func AccountLicensingSource(licensingSourceValue string) (*licensing.LicensingSo
 		return nil, fmt.Errorf("Error unable to match given LicensingSource :%s", licensingSourceValue)
 	}
 	return &licensingSource, nil
+}
+
+func DecodeUtf16HexString(message string) (string, error) {
+	b, err := hex.DecodeString(message)
+	if err != nil {
+		return "", err
+	}
+	ints := make([]uint16, len(b)/2)
+	if err := binary.Read(bytes.NewReader(b), binary.LittleEndian, &ints); err != nil {
+		return "", err
+	}
+	return string(utf16.Decode(ints)), nil
+}
+
+func EncodeUtf16HexString(message string) (string, error) {
+	runeByte := []rune(message)
+	encodedByte := utf16.Encode(runeByte)
+	var sb strings.Builder
+	for i := 0; i < len(encodedByte); i++ {
+		fmt.Fprintf(&sb, "%02x%02x", encodedByte[i], encodedByte[i]>>8)
+	}
+	return sb.String(), nil
 }

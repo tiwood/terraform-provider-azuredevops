@@ -11,8 +11,10 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops/core"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/git"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/identity"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/memberentitlementmanagement"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/operations"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/security"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
 )
@@ -33,6 +35,9 @@ type AggregatedClient struct {
 	ServiceEndpointClient         serviceendpoint.Client
 	TaskAgentClient               taskagent.Client
 	MemberEntitleManagementClient memberentitlementmanagement.Client
+	SecurityClient                security.Client
+	IdentityClient                identity.Client
+	GitClient                     git.Client
 	Ctx                           context.Context
 }
 
@@ -106,6 +111,19 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		return nil, err
 	}
 
+	securityClient := security.NewClient(ctx, connection)
+	identityClient, err := identity.NewClient(ctx, connection)
+	if err != nil {
+		log.Printf("getAzdoClient(): identity.NewClient failed.")
+		return nil, err
+	}
+
+	gitClient, err := git.NewClient(ctx, connection)
+	if err != nil {
+		log.Printf("getAzdoClient(): git.NewClient failed.")
+		return nil, err
+	}
+
 	aggregatedClient := &AggregatedClient{
 		CoreClient:                    coreClient,
 		BuildClient:                   buildClient,
@@ -115,6 +133,9 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		ServiceEndpointClient:         serviceEndpointClient,
 		TaskAgentClient:               taskagentClient,
 		MemberEntitleManagementClient: memberentitlementmanagementClient,
+		SecurityClient:                securityClient,
+		IdentityClient:                identityClient,
+		GitClient:                     gitClient,
 		Ctx:                           ctx,
 	}
 
