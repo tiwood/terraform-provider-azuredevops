@@ -41,9 +41,9 @@ function compile() {
     go mod download
     if [ $debugBuild -eq 1 ]; then
       info "Using debug build settings"
-      go build -o "$BUILD_DIR/$BUILD_ARTIFACT" -gcflags=all="-N -l"
+      go build -mod=vendor -o "$BUILD_DIR/$BUILD_ARTIFACT" -gcflags=all="-N -l"
     else
-      go build -o "$BUILD_DIR/$BUILD_ARTIFACT"
+      go build -mod=vendor -o "$BUILD_DIR/$BUILD_ARTIFACT"
     fi
   )
 }

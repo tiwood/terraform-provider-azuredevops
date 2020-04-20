@@ -23,6 +23,7 @@ Push-Location -Path $SOURCE_DIR
 try {
     $argv = @(
         'test',
+        '-mod=vendor',
         '-v'
     )
     if ($TestFilter) {

@@ -43,6 +43,7 @@ function compile() {
 
         $argv = @(
             'build',
+            '-mod=vendor',
             '-o',
             "$BUILD_DIR/$BUILD_ARTIFACT"
         )

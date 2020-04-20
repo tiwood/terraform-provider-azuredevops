@@ -34,6 +34,7 @@ try {
     $env:TF_ACC=1
     $argv = @(
         'test',
+        '-mod=vendor',
         '-v'
     )
     if ($TestFilter) {
