@@ -29,6 +29,7 @@ func TestAzureDevOpsProvider_HasChildResources(t *testing.T) {
 		"azuredevops_agent_pool",
 		"azuredevops_project_permissions",
 		"azuredevops_git_permissions",
+		"azuredevops_resource_authorization",
 	}
 
 	resources := provider.ResourcesMap
