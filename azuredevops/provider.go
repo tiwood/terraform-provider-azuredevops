@@ -11,7 +11,7 @@ func Provider() *schema.Provider {
 		ResourcesMap: map[string]*schema.Resource{
 			"azuredevops_build_definition":          resourceBuildDefinition(),
 			"azuredevops_project":                   resourceProject(),
-			"azuredevops_project_features":			 resourceProjectFeatures(),
+			"azuredevops_project_features":          resourceProjectFeatures(),
 			"azuredevops_variable_group":            resourceVariableGroup(),
 			"azuredevops_serviceendpoint_azurerm":   resourceServiceEndpointAzureRM(),
 			"azuredevops_serviceendpoint_bitbucket": resourceServiceEndpointBitBucket(),

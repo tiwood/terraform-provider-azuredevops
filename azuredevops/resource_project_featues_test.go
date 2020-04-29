@@ -7,23 +7,12 @@ package azuredevops
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/microsoft/terraform-provider-azuredevops/azdosdkmocks"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
-	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/terraform"
-	"github.com/microsoft/azure-devops-go-api/azuredevops/core"
-	"github.com/microsoft/azure-devops-go-api/azuredevops/operations"
-	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -38,10 +27,10 @@ func TestProjectFeatures_Read_TestDontSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	coreClient := azdosdkmocks.NewMockCoreClient(ctrl)
+	featureClient := azdosdkmocks.NewMockFeaturemanagementClient(ctrl)
 	clients := &config.AggregatedClient{
-		CoreClient: coreClient,
-		Ctx:        context.Background(),
+		FeatureManagementClient: featureClient,
+		Ctx:                     context.Background(),
 	}
 
 	/* start writing test here */
