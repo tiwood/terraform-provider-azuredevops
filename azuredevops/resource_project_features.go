@@ -94,8 +94,10 @@ func validateFeatures(i interface{}, k string) ([]string, []error) {
 
 func getProjectFeatureIDs() *[]string {
 	keys := make([]string, len(projectFeatureNameMap))
+	idx := 0
 	for k := range projectFeatureNameMap {
-		keys = append(keys, k)
+		keys[idx] = k
+		idx++
 	}
 	return &keys
 }
@@ -137,7 +139,7 @@ func resourceProjectFeaturesRead(d *schema.ResourceData, m interface{}) error {
 
 	featureStates := d.Get("features").(map[string]interface{})
 	for k := range *currentFeatureStates {
-		if _, ok := featureStates[k]; !ok {
+		if _, ok := featureStates[string(k)]; !ok {
 			delete(*currentFeatureStates, k)
 		}
 	}
@@ -175,7 +177,7 @@ func setProjectFeatureStates(ctx context.Context, fc featuremanagement.Client, p
 	return nil
 }
 
-func readProjectFeatureStates(ctx context.Context, fc featuremanagement.Client, projectID string) (*map[string]string, error) {
+func readProjectFeatureStates(ctx context.Context, fc featuremanagement.Client, projectID string) (*map[ProjectFeatureType]string, error) {
 	states, err := fc.QueryFeatureStates(ctx, featuremanagement.QueryFeatureStatesArgs{
 		Query: &featuremanagement.ContributedFeatureStateQuery{
 			FeatureIds: getProjectFeatureIDs(),
@@ -189,11 +191,11 @@ func readProjectFeatureStates(ctx context.Context, fc featuremanagement.Client, 
 		return nil, err
 	}
 
-	featureStates := make(map[string]string)
+	featureStates := make(map[ProjectFeatureType]string)
 	for k := range projectFeatureNameMap {
 		state, ok := (*states.FeatureStates)[k]
 		if ok {
-			featureStates[k] = string(*state.State)
+			featureStates[projectFeatureNameMap[k]] = string(*state.State)
 		}
 	}
 	return &featureStates, nil
