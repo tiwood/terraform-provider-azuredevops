@@ -77,6 +77,14 @@ func resourceProject() *schema.Resource {
 				ForceNew: true,
 				Computed: true,
 			},
+			"features": {
+				Type:         schema.TypeMap,
+				Required:     true,
+				ValidateFunc: validateFeatures,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
 		},
 	}
 }
@@ -91,6 +99,16 @@ func resourceProjectCreate(d *schema.ResourceData, m interface{}) error {
 	err = createProject(clients, project, projectCreateTimeoutDuration)
 	if err != nil {
 		return fmt.Errorf("Error creating project: %v", err)
+	}
+
+	featureStates, ok := d.GetOkExists("features")
+	if ok {
+		projectID := project.Id.String()
+		err := setProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, projectID, featureStates.(map[string]interface{}))
+		if err != nil {
+			deleteProject(clients, projectID, projectDeleteTimeoutDuration)
+			return err
+		}
 	}
 
 	d.Set("project_name", *project.Name)
@@ -190,6 +208,21 @@ func resourceProjectUpdate(d *schema.ResourceData, m interface{}) error {
 	if err != nil {
 		return fmt.Errorf("Error updating project: %v", err)
 	}
+
+	d.Partial(true)
+
+	if !d.HasChange("features") {
+		featureStates := d.Get("features").(map[string]interface{})
+		err := setProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, project.Id.String(), featureStates)
+		if err != nil {
+			return err
+		}
+	}
+
+	// We succeeded, disable partial mode. This causes Terraform to save
+	// all fields again.
+	d.Partial(false)
+
 	return resourceProjectRead(d, m)
 }
 
@@ -286,6 +319,16 @@ func flattenProject(clients *config.AggregatedClient, d *schema.ResourceData, pr
 		return err
 	}
 
+	var currentFeatureStates *map[ProjectFeatureType]string
+	_, ok := d.GetOkExists("features")
+	if ok {
+		states, err := getConfiguredProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, d, project.Id.String())
+		if err != nil {
+			return nil
+		}
+		currentFeatureStates = states
+	}
+
 	d.SetId(project.Id.String())
 	d.Set("project_name", *project.Name)
 	d.Set("visibility", *project.Visibility)
@@ -293,6 +336,9 @@ func flattenProject(clients *config.AggregatedClient, d *schema.ResourceData, pr
 	d.Set("version_control", (*project.Capabilities)["versioncontrol"]["sourceControlType"])
 	d.Set("process_template_id", processTemplateID)
 	d.Set("work_item_template", processTemplateName)
+	if currentFeatureStates != nil {
+		d.Set("features", *currentFeatureStates)
+	}
 
 	return nil
 }

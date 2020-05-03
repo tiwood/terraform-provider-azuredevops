@@ -132,9 +132,19 @@ func resourceProjectFeaturesRead(d *schema.ResourceData, m interface{}) error {
 
 	projectID := d.Get("project_id").(string)
 
-	currentFeatureStates, err := readProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, projectID)
+	currentFeatureStates, err := getConfiguredProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, d, projectID)
 	if err != nil {
-		return err
+		return nil
+	}
+
+	d.Set("features", *currentFeatureStates)
+	return nil
+}
+
+func getConfiguredProjectFeatureStates(ctx context.Context, fc featuremanagement.Client, d *schema.ResourceData, projectID string) (*map[ProjectFeatureType]string, error) {
+	currentFeatureStates, err := readProjectFeatureStates(ctx, fc, projectID)
+	if err != nil {
+		return nil, err
 	}
 
 	featureStates := d.Get("features").(map[string]interface{})
@@ -143,9 +153,7 @@ func resourceProjectFeaturesRead(d *schema.ResourceData, m interface{}) error {
 			delete(*currentFeatureStates, k)
 		}
 	}
-
-	d.Set("features", *currentFeatureStates)
-	return nil
+	return currentFeatureStates, nil
 }
 
 func setProjectFeatureStates(ctx context.Context, fc featuremanagement.Client, projectID string, featureStates map[string]interface{}) error {
