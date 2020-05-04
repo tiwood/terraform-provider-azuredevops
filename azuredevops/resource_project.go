@@ -53,6 +53,7 @@ func resourceProject() *schema.Resource {
 					string(core.ProjectVisibilityValues.Private),
 					string(core.ProjectVisibilityValues.Public),
 				}, false),
+				DiffSuppressFunc: suppress.CaseDifference,
 			},
 			"version_control": {
 				Type:     schema.TypeString,
@@ -63,6 +64,7 @@ func resourceProject() *schema.Resource {
 					string(core.SourceControlTypesValues.Git),
 					string(core.SourceControlTypesValues.Tfvc),
 				}, true),
+				DiffSuppressFunc: suppress.CaseDifference,
 			},
 			"work_item_template": {
 				Type:             schema.TypeString,
@@ -74,12 +76,12 @@ func resourceProject() *schema.Resource {
 			},
 			"process_template_id": {
 				Type:     schema.TypeString,
-				ForceNew: true,
 				Computed: true,
 			},
 			"features": {
 				Type:         schema.TypeMap,
-				Required:     true,
+				Optional:     true,
+				Computed:     true,
 				ValidateFunc: validateFeatures,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
@@ -103,8 +105,13 @@ func resourceProjectCreate(d *schema.ResourceData, m interface{}) error {
 
 	featureStates, ok := d.GetOkExists("features")
 	if ok {
+		name := d.Get("project_name").(string)
+		project, err := ProjectRead(clients, "", name)
+		if err != nil {
+			return err
+		}
 		projectID := project.Id.String()
-		err := setProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, projectID, featureStates.(map[string]interface{}))
+		err = setProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, projectID, featureStates.(map[string]interface{}))
 		if err != nil {
 			deleteProject(clients, projectID, projectDeleteTimeoutDuration)
 			return err
@@ -204,14 +211,33 @@ func resourceProjectUpdate(d *schema.ResourceData, m interface{}) error {
 		return fmt.Errorf("Error converting terraform data model to AzDO project reference: %+v", err)
 	}
 
-	err = updateProject(clients, project, projectCreateTimeoutDuration)
-	if err != nil {
-		return fmt.Errorf("Error updating project: %v", err)
+	requiresUpdate := false
+	if !d.HasChange("project_name") {
+		project.Name = nil
+	} else {
+		requiresUpdate = true
+	}
+	if !d.HasChange("description") {
+		project.Description = nil
+	} else {
+		requiresUpdate = true
+	}
+	if !d.HasChange("visibility") {
+		project.Visibility = nil
+	} else {
+		requiresUpdate = true
+	}
+
+	if requiresUpdate {
+		err = updateProject(clients, project, projectCreateTimeoutDuration)
+		if err != nil {
+			return fmt.Errorf("Error updating project: %v", err)
+		}
 	}
 
 	d.Partial(true)
 
-	if !d.HasChange("features") {
+	if d.HasChange("features") {
 		featureStates := d.Get("features").(map[string]interface{})
 		err := setProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, project.Id.String(), featureStates)
 		if err != nil {
