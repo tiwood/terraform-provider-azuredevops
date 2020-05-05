@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops/security"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/workitemtracking"
 )
 
 // AggregatedClient aggregates all of the underlying clients into a single data
@@ -38,6 +39,7 @@ type AggregatedClient struct {
 	SecurityClient                security.Client
 	IdentityClient                identity.Client
 	GitClient                     git.Client
+	WitClient                     workitemtracking.Client
 	Ctx                           context.Context
 }
 
@@ -98,6 +100,14 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		return nil, err
 	}
 
+	// client for these APIs:
+	//	https://docs.microsoft.com/en-us/rest/api/azure/devops/wit/?view=azure-devops-rest-5.1
+	witClient, err := workitemtracking.NewClient(ctx, connection)
+	if err != nil {
+		log.Printf("getAzdoClient(): workitemtracking.NewClient failed.")
+		return nil, err
+	}
+
 	//  https://docs.microsoft.com/en-us/rest/api/azure/devops/graph/?view=azure-devops-rest-5.1
 	graphClient, err := graph.NewClient(ctx, connection)
 	if err != nil {
@@ -136,6 +146,7 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		SecurityClient:                securityClient,
 		IdentityClient:                identityClient,
 		GitClient:                     gitClient,
+		WitClient:                     witClient,
 		Ctx:                           ctx,
 	}
 

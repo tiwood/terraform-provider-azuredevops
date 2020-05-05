@@ -3,7 +3,11 @@
 package converter
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/microsoft/azure-devops-go-api/azuredevops/licensing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestString(t *testing.T) {
@@ -37,8 +41,6 @@ func TestBoolFalse(t *testing.T) {
 		t.Errorf("The pointer returned references a different value")
 	}
 }
-<<<<<<< HEAD
-=======
 
 func TestLicenseTypeAccount(t *testing.T) {
 	assertAccountLicenseType(t, licensing.AccountLicenseTypeValues.None)
@@ -108,4 +110,3 @@ func TestEncodeUtf16HexString(t *testing.T) {
 		assert.EqualValues(t, etest.encodedString, val)
 	}
 }
->>>>>>> origin/r_permissions
