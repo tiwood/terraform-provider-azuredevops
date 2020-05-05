@@ -1,8 +1,5 @@
 package converter
 
-<<<<<<< HEAD
-import "strings"
-=======
 import (
 	"bytes"
 	"encoding/binary"
@@ -13,7 +10,6 @@ import (
 
 	"github.com/microsoft/azure-devops-go-api/azuredevops/licensing"
 )
->>>>>>> origin/r_permissions
 
 // String Get a pointer to a string
 func String(value string) *string {
@@ -60,8 +56,6 @@ func ToBool(value *bool, defaultValue bool) bool {
 
 	return defaultValue
 }
-<<<<<<< HEAD
-=======
 
 // AccountLicenseType Get a pointer to an AccountLicenseType
 func AccountLicenseType(accountLicenseTypeValue string) (*licensing.AccountLicenseType, error) {
@@ -106,4 +100,3 @@ func EncodeUtf16HexString(message string) (string, error) {
 	}
 	return sb.String(), nil
 }
->>>>>>> origin/r_permissions
