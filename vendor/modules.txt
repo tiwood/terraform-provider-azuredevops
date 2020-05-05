@@ -205,6 +205,7 @@ github.com/microsoft/azure-devops-go-api/azuredevops/memberentitlementmanagement
 github.com/microsoft/azure-devops-go-api/azuredevops/operations
 github.com/microsoft/azure-devops-go-api/azuredevops/policy
 github.com/microsoft/azure-devops-go-api/azuredevops/profile
+github.com/microsoft/azure-devops-go-api/azuredevops/security
 github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint
 github.com/microsoft/azure-devops-go-api/azuredevops/taskagent
 github.com/microsoft/azure-devops-go-api/azuredevops/test
@@ -277,6 +278,7 @@ go.opencensus.io/stats
 go.opencensus.io/stats/view
 go.opencensus.io/tag
 go.opencensus.io/trace/propagation
+<<<<<<< HEAD
 go.opencensus.io
 go.opencensus.io/metric/metricdata
 go.opencensus.io/stats/internal
@@ -286,6 +288,18 @@ go.opencensus.io/resource
 # golang.org/x/crypto v0.0.0-20200427165652-729f1e841bcc
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
+=======
+go.opencensus.io/trace/tracestate
+# golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
+golang.org/x/crypto/bcrypt
+golang.org/x/crypto/blowfish
+golang.org/x/crypto/cast5
+golang.org/x/crypto/chacha20
+golang.org/x/crypto/curve25519
+golang.org/x/crypto/ed25519
+golang.org/x/crypto/ed25519/internal/edwards25519
+golang.org/x/crypto/internal/subtle
+>>>>>>> origin/r_permissions
 golang.org/x/crypto/openpgp
 golang.org/x/crypto/ssh
 golang.org/x/crypto/openpgp/armor
@@ -296,12 +310,18 @@ golang.org/x/crypto/chacha20
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/poly1305
+<<<<<<< HEAD
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/cast5
 golang.org/x/crypto/openpgp/elgamal
 golang.org/x/crypto/internal/subtle
 golang.org/x/crypto/ed25519/internal/edwards25519
 # golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
+=======
+golang.org/x/crypto/ssh
+golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
+# golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
+>>>>>>> origin/r_permissions
 golang.org/x/net/context
 golang.org/x/net/trace
 golang.org/x/net/internal/timeseries
@@ -316,7 +336,12 @@ golang.org/x/oauth2/internal
 golang.org/x/oauth2/google
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
+<<<<<<< HEAD
 # golang.org/x/sys v0.0.0-20200428200454-593003d681fa
+=======
+# golang.org/x/sys v0.0.0-20200413165638-669c56c373c4
+golang.org/x/sys/cpu
+>>>>>>> origin/r_permissions
 golang.org/x/sys/unix
 golang.org/x/sys/cpu
 # golang.org/x/text v0.3.2

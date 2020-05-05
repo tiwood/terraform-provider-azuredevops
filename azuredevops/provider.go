@@ -1,6 +1,9 @@
 package azuredevops
 
 import (
+	"os"
+	"time"
+
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
 )
@@ -21,6 +24,8 @@ func Provider() *schema.Provider {
 			"azuredevops_group_membership":          resourceGroupMembership(),
 			"azuredevops_agent_pool":                resourceAzureAgentPool(),
 			"azuredevops_group":                     resourceGroup(),
+			"azuredevops_project_permissions":       resourceProjectPermissions(),
+			"azuredevops_git_permissions":           resourceGitPermissions(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"azuredevops_group":            dataGroup(),
@@ -55,5 +60,15 @@ func providerConfigure(p *schema.Provider) schema.ConfigureFunc {
 	return func(d *schema.ResourceData) (interface{}, error) {
 		client, err := config.GetAzdoClient(d.Get("personal_access_token").(string), d.Get("org_service_url").(string))
 		return client, err
+	}
+}
+
+var debugWaitPassed = false
+
+func debugWait(force ...bool) {
+	bForce := force != nil && force[0]
+	if (!debugWaitPassed || bForce) && "1" == os.Getenv("AZDO_PROVIDER_DEBUG") {
+		time.Sleep(20 * time.Second)
+		debugWaitPassed = true
 	}
 }

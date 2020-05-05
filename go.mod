@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/ahmetb/go-linq v3.0.0+incompatible
+	github.com/davecgh/go-spew v1.1.1
 	github.com/golang/mock v1.4.1
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/go-uuid v1.0.1
@@ -11,6 +12,7 @@ require (
 	github.com/hashicorp/terraform-plugin-sdk v1.8.0
 	github.com/microsoft/azure-devops-go-api/azuredevops v0.0.0-20200327121006-543de4815ec2
 	github.com/stretchr/testify v1.3.0
+<<<<<<< HEAD
 	github.com/yuin/goldmark v1.1.30 // indirect
 	golang.org/x/crypto v0.0.0-20200427165652-729f1e841bcc
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
@@ -18,4 +20,9 @@ require (
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a // indirect
 	golang.org/x/sys v0.0.0-20200428200454-593003d681fa // indirect
 	golang.org/x/tools v0.0.0-20200428211048-dbf5ce1eac26 // indirect
+=======
+	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
+	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
+	golang.org/x/sys v0.0.0-20200413165638-669c56c373c4 // indirect
+>>>>>>> origin/r_permissions
 )
