@@ -18,6 +18,7 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops/security"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/workitemtracking"
 )
 
 // AggregatedClient aggregates all of the underlying clients into a single data
@@ -28,7 +29,6 @@ import (
 // allow for mocking to support unit testing of the funcs that invoke the
 // Azure DevOps client.
 type AggregatedClient struct {
-	Ctx                           context.Context
 	CoreClient                    core.Client
 	BuildClient                   build.Client
 	GitReposClient                git.Client
@@ -40,6 +40,8 @@ type AggregatedClient struct {
 	SecurityClient                security.Client
 	IdentityClient                identity.Client
 	FeatureManagementClient       featuremanagement.Client
+	WitClient                     workitemtracking.Client
+	Ctx                           context.Context
 }
 
 // GetAzdoClient builds and provides a connection to the Azure DevOps API
@@ -99,6 +101,14 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		return nil, err
 	}
 
+	// client for these APIs:
+	//	https://docs.microsoft.com/en-us/rest/api/azure/devops/wit/?view=azure-devops-rest-5.1
+	witClient, err := workitemtracking.NewClient(ctx, connection)
+	if err != nil {
+		log.Printf("getAzdoClient(): workitemtracking.NewClient failed.")
+		return nil, err
+	}
+
 	//  https://docs.microsoft.com/en-us/rest/api/azure/devops/graph/?view=azure-devops-rest-5.1
 	graphClient, err := graph.NewClient(ctx, connection)
 	if err != nil {
@@ -134,6 +144,7 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		SecurityClient:                securityClient,
 		IdentityClient:                identityClient,
 		FeatureManagementClient:       featuremanagement,
+		WitClient:                     witClient,
 	}
 
 	log.Printf("getAzdoClient(): Created core, build, operations, and serviceendpoint clients successfully!")

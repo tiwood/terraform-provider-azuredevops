@@ -30,9 +30,13 @@ func Provider() *schema.Provider {
 			"azuredevops_project_permissions":         resourceProjectPermissions(),
 			"azuredevops_git_permissions":             resourceGitPermissions(),
 			"azuredevops_resource_authorization":      resourceResourceAuthorization(),
+			"azuredevops_area_permissions":            resourceAreaPermissions(),
+			"azuredevops_iteration_permissions":       resourceIterationPermissions(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
+			"azuredevops_area":             dataArea(),
 			"azuredevops_group":            dataGroup(),
+			"azuredevops_iteration":        dataIteration(),
 			"azuredevops_project":          dataProject(),
 			"azuredevops_projects":         dataProjects(),
 			"azuredevops_git_repositories": dataGitRepositories(),
