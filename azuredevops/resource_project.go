@@ -19,6 +19,7 @@ import (
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/suppress"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/tfhelper"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/validate"
+	"github.com/pkg/errors"
 )
 
 var projectCreateTimeoutDuration time.Duration = 60 * 3
@@ -53,6 +54,7 @@ func resourceProject() *schema.Resource {
 					string(core.ProjectVisibilityValues.Private),
 					string(core.ProjectVisibilityValues.Public),
 				}, false),
+				DiffSuppressFunc: suppress.CaseDifference,
 			},
 			"version_control": {
 				Type:     schema.TypeString,
@@ -63,6 +65,7 @@ func resourceProject() *schema.Resource {
 					string(core.SourceControlTypesValues.Git),
 					string(core.SourceControlTypesValues.Tfvc),
 				}, true),
+				DiffSuppressFunc: suppress.CaseDifference,
 			},
 			"work_item_template": {
 				Type:             schema.TypeString,
@@ -74,8 +77,16 @@ func resourceProject() *schema.Resource {
 			},
 			"process_template_id": {
 				Type:     schema.TypeString,
-				ForceNew: true,
 				Computed: true,
+			},
+			"features": {
+				Type:         schema.TypeMap,
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validateFeatures,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
 			},
 		},
 	}
@@ -91,6 +102,24 @@ func resourceProjectCreate(d *schema.ResourceData, m interface{}) error {
 	err = createProject(clients, project, projectCreateTimeoutDuration)
 	if err != nil {
 		return fmt.Errorf("Error creating project: %v", err)
+	}
+
+	featureStates, ok := d.GetOk("features")
+	if ok {
+		name := d.Get("project_name").(string)
+		project, err := ProjectRead(clients, "", name)
+		if err != nil {
+			return err
+		}
+		projectID := project.Id.String()
+		err = setProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, projectID, featureStates.(map[string]interface{}))
+		if err != nil {
+			ierr := deleteProject(clients, projectID, projectDeleteTimeoutDuration)
+			if ierr != nil {
+				err = errors.Wrapf(err, "failed to delete new project after failed to apply feature settings; %w", ierr)
+			}
+			return err
+		}
 	}
 
 	d.Set("project_name", *project.Name)
@@ -186,10 +215,38 @@ func resourceProjectUpdate(d *schema.ResourceData, m interface{}) error {
 		return fmt.Errorf("Error converting terraform data model to AzDO project reference: %+v", err)
 	}
 
-	err = updateProject(clients, project, projectCreateTimeoutDuration)
-	if err != nil {
-		return fmt.Errorf("Error updating project: %v", err)
+	requiresUpdate := false
+	if !d.HasChange("project_name") {
+		project.Name = nil
+	} else {
+		requiresUpdate = true
 	}
+	if !d.HasChange("description") {
+		project.Description = nil
+	} else {
+		requiresUpdate = true
+	}
+	if !d.HasChange("visibility") {
+		project.Visibility = nil
+	} else {
+		requiresUpdate = true
+	}
+
+	if requiresUpdate {
+		err = updateProject(clients, project, projectCreateTimeoutDuration)
+		if err != nil {
+			return fmt.Errorf("Error updating project: %v", err)
+		}
+	}
+
+	if d.HasChange("features") {
+		featureStates := d.Get("features").(map[string]interface{})
+		err := setProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, project.Id.String(), featureStates)
+		if err != nil {
+			return err
+		}
+	}
+
 	return resourceProjectRead(d, m)
 }
 
@@ -286,6 +343,16 @@ func flattenProject(clients *config.AggregatedClient, d *schema.ResourceData, pr
 		return err
 	}
 
+	var currentFeatureStates *map[ProjectFeatureType]string
+	_, ok := d.GetOk("features")
+	if ok {
+		states, err := getConfiguredProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, d, project.Id.String())
+		if err != nil {
+			return nil
+		}
+		currentFeatureStates = states
+	}
+
 	d.SetId(project.Id.String())
 	d.Set("project_name", *project.Name)
 	d.Set("visibility", *project.Visibility)
@@ -293,6 +360,9 @@ func flattenProject(clients *config.AggregatedClient, d *schema.ResourceData, pr
 	d.Set("version_control", (*project.Capabilities)["versioncontrol"]["sourceControlType"])
 	d.Set("process_template_id", processTemplateID)
 	d.Set("work_item_template", processTemplateName)
+	if currentFeatureStates != nil {
+		d.Set("features", *currentFeatureStates)
+	}
 
 	return nil
 }

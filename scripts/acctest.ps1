@@ -8,7 +8,12 @@ param (
     [Parameter()]
     [ValidateNotNullOrEmpty()]
     [string[]]
-    $Tag = 'all'
+    $Tag = 'all',
+
+    [Parameter()]
+    [ValidateSet('', 'readonly', 'vendor')]
+    [string]
+    $GoMod = 'vendor'
 )
 
 $script:PSDefaultParameterValues = @{
@@ -32,9 +37,12 @@ try {
     #
     # Using build tags as test filter: https://stackoverflow.com/a/24036237
     $env:TF_ACC=1
+    $env:TF_SCHEMA_PANIC_ON_ERROR=1
+    $env:GO111MODULE='on'
+  
     $argv = @(
         'test',
-        '-mod=vendor',
+        "-mod=$(if ('' -ne $GoMod) { $GoMod } else { $null })",
         '-v'
     )
     if ($TestFilter) {
@@ -49,5 +57,7 @@ try {
     }
 }
 finally {
+    'TF_ACC', 'TF_SCHEMA_PANIC_ON_ERROR', 'GO111MODULE' `
+    | ForEach-Object -Process {Remove-Item -Path "Env:$_" }
     Pop-Location
 }

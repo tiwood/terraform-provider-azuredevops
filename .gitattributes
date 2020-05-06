@@ -1,6 +1,6 @@
 go.mod text eol=lf
 go.sum text eol=lf
-*.sh text eol=lf\n
+*.sh text eol=lf
+*.go text eol=lf
 go.mod merge=drv_ignore
-\n
 go.sum merge=drv_ignore

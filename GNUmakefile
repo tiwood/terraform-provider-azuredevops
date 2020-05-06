@@ -2,11 +2,12 @@ TEST?=$$(go list ./... |grep -v 'vendor')
 WEBSITE_REPO=github.com/hashicorp/terraform-website
 PKG_NAME=azuredevops
 TESTTIMEOUT=180m
+GO_MOD=vendor
 
 .EXPORT_ALL_VARIABLES:
   TF_SCHEMA_PANIC_ON_ERROR=1
   GO111MODULE=on
-  GOFLAGS=-mod=vendor
+  GOFLAGS=-mod=${GO_MOD}
 
 default: build
 

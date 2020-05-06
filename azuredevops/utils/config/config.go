@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/build"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/core"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/featuremanagement"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/git"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/graph"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/identity"
@@ -27,6 +28,7 @@ import (
 // allow for mocking to support unit testing of the funcs that invoke the
 // Azure DevOps client.
 type AggregatedClient struct {
+	Ctx                           context.Context
 	CoreClient                    core.Client
 	BuildClient                   build.Client
 	GitReposClient                git.Client
@@ -37,8 +39,7 @@ type AggregatedClient struct {
 	MemberEntitleManagementClient memberentitlementmanagement.Client
 	SecurityClient                security.Client
 	IdentityClient                identity.Client
-	GitClient                     git.Client
-	Ctx                           context.Context
+	FeatureManagementClient       featuremanagement.Client
 }
 
 // GetAzdoClient builds and provides a connection to the Azure DevOps API
@@ -118,13 +119,10 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		return nil, err
 	}
 
-	gitClient, err := git.NewClient(ctx, connection)
-	if err != nil {
-		log.Printf("getAzdoClient(): git.NewClient failed.")
-		return nil, err
-	}
+	featuremanagement := featuremanagement.NewClient(ctx, connection)
 
 	aggregatedClient := &AggregatedClient{
+		Ctx:                           ctx,
 		CoreClient:                    coreClient,
 		BuildClient:                   buildClient,
 		GitReposClient:                gitReposClient,
@@ -135,8 +133,7 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 		MemberEntitleManagementClient: memberentitlementmanagementClient,
 		SecurityClient:                securityClient,
 		IdentityClient:                identityClient,
-		GitClient:                     gitClient,
-		Ctx:                           ctx,
+		FeatureManagementClient:       featuremanagement,
 	}
 
 	log.Printf("getAzdoClient(): Created core, build, operations, and serviceendpoint clients successfully!")

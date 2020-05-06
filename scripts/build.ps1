@@ -1,13 +1,21 @@
 [CmdletBinding()]
 param (
+    [Parameter()]
     [switch]
     $SkipTests,
 
+    [Parameter()]
     [switch]
     $Install,
 
+    [Parameter()]
     [switch]
-    $DebugBuild
+    $DebugBuild,
+
+    [Parameter()]
+    [ValidateSet('', 'readonly', 'vendor')]
+    [string]
+    $GoMod = 'vendor'
 )
 
 $script:PSDefaultParameterValues = @{
@@ -36,6 +44,8 @@ function compile() {
     Write-Host "Attempting to build $BUILD_ARTIFACT"
     Push-Location -Path $SOURCE_DIR
     try {
+        $env:GO111MODULE='on'
+
         go mod download
         if ($LASTEXITCODE) {
             throw "Failed to download modules"
@@ -43,7 +53,7 @@ function compile() {
 
         $argv = @(
             'build',
-            '-mod=vendor',
+            "-mod=$(if ('' -ne $GoMod) { $GoMod } else { $null })",
             '-o',
             "$BUILD_DIR/$BUILD_ARTIFACT"
         )
@@ -56,6 +66,8 @@ function compile() {
         }
     }
     finally {
+        'GO111MODULE' `
+        | ForEach-Object -Process {Remove-Item -Path "Env:$_" }    
         Pop-Location
     }
 }
@@ -64,7 +76,7 @@ function clean_and_build() {
     clean
     compile
     if (-not $SkipTests) {
-        & (Join-Path -Path $PSScriptRoot -ChildPath 'unittest.ps1' -Resolve)
+        & (Join-Path -Path $PSScriptRoot -ChildPath 'unittest.ps1' -Resolve) -GoMod $GoMod
     }
     Write-Host "Build finished successfully"
     if ($Install) {
