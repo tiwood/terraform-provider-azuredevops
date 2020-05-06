@@ -19,6 +19,7 @@ import (
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/suppress"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/tfhelper"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/validate"
+	"github.com/pkg/errors"
 )
 
 var projectCreateTimeoutDuration time.Duration = 60 * 3
@@ -103,7 +104,7 @@ func resourceProjectCreate(d *schema.ResourceData, m interface{}) error {
 		return fmt.Errorf("Error creating project: %v", err)
 	}
 
-	featureStates, ok := d.GetOkExists("features")
+	featureStates, ok := d.GetOk("features")
 	if ok {
 		name := d.Get("project_name").(string)
 		project, err := ProjectRead(clients, "", name)
@@ -113,7 +114,10 @@ func resourceProjectCreate(d *schema.ResourceData, m interface{}) error {
 		projectID := project.Id.String()
 		err = setProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, projectID, featureStates.(map[string]interface{}))
 		if err != nil {
-			deleteProject(clients, projectID, projectDeleteTimeoutDuration)
+			ierr := deleteProject(clients, projectID, projectDeleteTimeoutDuration)
+			if ierr != nil {
+				err = errors.Wrapf(err, "failed to delete new project after failed to apply feature settings; %w", ierr)
+			}
 			return err
 		}
 	}
@@ -235,8 +239,6 @@ func resourceProjectUpdate(d *schema.ResourceData, m interface{}) error {
 		}
 	}
 
-	d.Partial(true)
-
 	if d.HasChange("features") {
 		featureStates := d.Get("features").(map[string]interface{})
 		err := setProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, project.Id.String(), featureStates)
@@ -244,10 +246,6 @@ func resourceProjectUpdate(d *schema.ResourceData, m interface{}) error {
 			return err
 		}
 	}
-
-	// We succeeded, disable partial mode. This causes Terraform to save
-	// all fields again.
-	d.Partial(false)
 
 	return resourceProjectRead(d, m)
 }
@@ -346,7 +344,7 @@ func flattenProject(clients *config.AggregatedClient, d *schema.ResourceData, pr
 	}
 
 	var currentFeatureStates *map[ProjectFeatureType]string
-	_, ok := d.GetOkExists("features")
+	_, ok := d.GetOk("features")
 	if ok {
 		states, err := getConfiguredProjectFeatureStates(clients.Ctx, clients.FeatureManagementClient, d, project.Id.String())
 		if err != nil {
