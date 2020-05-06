@@ -41,8 +41,8 @@ var azurermTestServiceEndpointAzureRM = serviceendpoint.ServiceEndpoint{
 		"creationMode":     "Manual",
 		"environment":      "AzureCloud",
 		"scopeLevel":       "Subscription",
-		"SubscriptionId":   "42125daf-72fd-417c-9ea7-080690625ad3", //fake value
-		"SubscriptionName": "SUBSCRIPTION_TEST",
+		"subscriptionId":   "42125daf-72fd-417c-9ea7-080690625ad3", //fake value
+		"subscriptionName": "SUBSCRIPTION_TEST",
 	},
 	Id:          &azurermTestServiceEndpointAzureRMID,
 	Name:        converter.String("_AZURERM_UNIT_TEST_CONN_NAME"),

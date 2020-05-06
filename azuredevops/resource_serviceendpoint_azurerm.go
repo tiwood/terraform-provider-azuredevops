@@ -36,8 +36,8 @@ func expandServiceEndpointAzureRM(d *schema.ResourceData) (*serviceendpoint.Serv
 		"creationMode":     "Manual",
 		"environment":      "AzureCloud",
 		"scopeLevel":       "Subscription",
-		"SubscriptionId":   d.Get("azurerm_subscription_id").(string),
-		"SubscriptionName": d.Get("azurerm_subscription_name").(string),
+		"subscriptionId":   d.Get("azurerm_subscription_id").(string),
+		"subscriptionName": d.Get("azurerm_subscription_name").(string),
 	}
 	serviceEndpoint.Type = converter.String("azurerm")
 	serviceEndpoint.Url = converter.String("https://management.azure.com/")
