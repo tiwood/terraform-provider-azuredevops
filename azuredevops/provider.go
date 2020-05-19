@@ -35,6 +35,7 @@ func Provider() *schema.Provider {
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"azuredevops_area":             dataArea(),
+			"azuredevops_client_config":    dataClientConfig(),
 			"azuredevops_group":            dataGroup(),
 			"azuredevops_iteration":        dataIteration(),
 			"azuredevops_project":          dataProject(),
