@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/go-uuid v1.0.2
 	github.com/hashicorp/terraform v0.12.24
 	github.com/hashicorp/terraform-plugin-sdk v1.10.0
-	github.com/microsoft/azure-devops-go-api/azuredevops v0.0.0-20200327121006-543de4815ec2
+	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b2
 	github.com/pkg/errors v0.8.0
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
