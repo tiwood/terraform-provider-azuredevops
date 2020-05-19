@@ -80,9 +80,21 @@ func resourceUserEntitlement() *schema.Resource {
 					string(licensing.AccountLicenseTypeValues.Stakeholder),
 				}, true),
 				DiffSuppressFunc: func(_, old, new string, _ *schema.ResourceData) bool {
-					return (strings.EqualFold(old, "basic") && strings.EqualFold(new, "express")) ||
-						(strings.EqualFold(old, "express") && strings.EqualFold(new, "basic")) ||
-						strings.EqualFold(old, new)
+					equalEntitlements := []string{
+						string(licensing.AccountLicenseTypeValues.EarlyAdopter),
+						string(licensing.AccountLicenseTypeValues.Express),
+						"basic",
+					}
+					stringInSlice := func(v string, valid []string) bool {
+						for _, str := range valid {
+							if strings.EqualFold(v, str) {
+								return true
+							}
+						}
+						return false
+					}
+					return strings.EqualFold(old, new) ||
+						(stringInSlice(old, equalEntitlements) && stringInSlice(new, equalEntitlements))
 				},
 			},
 			"licensing_source": {
