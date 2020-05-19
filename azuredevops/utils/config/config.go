@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-sdk/httpclient"
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/build"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/core"
@@ -19,6 +21,7 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/workitemtracking"
+	"github.com/microsoft/terraform-provider-azuredevops/version"
 )
 
 // AggregatedClient aggregates all of the underlying clients into a single data
@@ -45,7 +48,7 @@ type AggregatedClient struct {
 }
 
 // GetAzdoClient builds and provides a connection to the Azure DevOps API
-func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, error) {
+func GetAzdoClient(azdoPAT string, organizationURL string, tfVersion string) (*AggregatedClient, error) {
 	ctx := context.Background()
 
 	if strings.EqualFold(azdoPAT, "") {
@@ -57,6 +60,7 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 	}
 
 	connection := azuredevops.NewPatConnection(organizationURL, azdoPAT)
+	setUserAgent(connection, tfVersion)
 
 	// client for these APIs (includes CRUD for AzDO projects...):
 	//	https://docs.microsoft.com/en-us/rest/api/azure/devops/core/?view=azure-devops-rest-5.1
@@ -149,4 +153,18 @@ func GetAzdoClient(azdoPAT string, organizationURL string) (*AggregatedClient, e
 
 	log.Printf("getAzdoClient(): Created core, build, operations, and serviceendpoint clients successfully!")
 	return aggregatedClient, nil
+}
+
+// setUserAgent set UserAgent for http headers
+func setUserAgent(connection *azuredevops.Connection, tfVersion string) {
+	tfUserAgent := httpclient.TerraformUserAgent(tfVersion)
+	providerUserAgent := fmt.Sprintf("%s terraform-provider-azuredevops/%s", tfUserAgent, version.ProviderVersion)
+	connection.UserAgent = strings.TrimSpace(fmt.Sprintf("%s %s", connection.UserAgent, providerUserAgent))
+
+	// append the CloudShell version to the user agent if it exists
+	if azureAgent := os.Getenv("AZURE_HTTP_USER_AGENT"); azureAgent != "" {
+		connection.UserAgent = fmt.Sprintf("%s %s", connection.UserAgent, azureAgent)
+	}
+
+	log.Printf("[DEBUG] AzureRM Client User Agent: %s\n", connection.UserAgent)
 }
