@@ -7,6 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/golang/mock v1.4.3
 	github.com/google/uuid v1.1.1
+	github.com/hashicorp/go-retryablehttp v0.6.6 // indirect
 	github.com/hashicorp/go-uuid v1.0.2
 	github.com/hashicorp/terraform v0.12.24
 	github.com/hashicorp/terraform-plugin-sdk v1.10.0
