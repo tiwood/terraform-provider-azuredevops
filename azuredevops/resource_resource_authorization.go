@@ -9,7 +9,12 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops/build"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/suppress"
 )
+
+const msgErrorFailedResourceCreate = "error creating authorized resource: %+v"
+const msgErrorFailedResourceUpdate = "error updating authorized resource: %+v"
+const msgErrorFailedResourceDelete = "error deleting authorized resource: %+v"
 
 func resourceResourceAuthorization() *schema.Resource {
 	return &schema.Resource{
@@ -31,11 +36,12 @@ func resourceResourceAuthorization() *schema.Resource {
 				ValidateFunc: validation.IsUUID,
 			},
 			"type": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				Default:      "endpoint",
-				Description:  "type of the resource",
-				ValidateFunc: validation.StringInSlice([]string{"endpoint"}, false),
+				Type:             schema.TypeString,
+				Optional:         true,
+				Default:          "endpoint",
+				Description:      "type of the resource",
+				DiffSuppressFunc: suppress.CaseDifference,
+				ValidateFunc:     validation.StringInSlice([]string{"endpoint"}, false),
 			},
 			"authorized": {
 				Type:        schema.TypeBool,
@@ -48,14 +54,14 @@ func resourceResourceAuthorization() *schema.Resource {
 
 func resourceResourceAuthorizationCreate(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
-	authorizedResource, projectId, err := expandAuthorizedResource(d)
+	authorizedResource, projectID, err := expandAuthorizedResource(d)
 	if err != nil {
-		return fmt.Errorf("error creating resource authorized resource: %+v", err)
+		return fmt.Errorf(msgErrorFailedResourceCreate, err)
 	}
 
-	_, err = sendAuthorizedResourceToAPI(clients, authorizedResource, projectId)
+	_, err = sendAuthorizedResourceToAPI(clients, authorizedResource, projectID)
 	if err != nil {
-		return fmt.Errorf("error creating resource authorized resource: %+v", err)
+		return fmt.Errorf(msgErrorFailedResourceCreate, err)
 	}
 
 	return resourceResourceAuthorizationRead(d, m)
@@ -65,18 +71,18 @@ func resourceResourceAuthorizationRead(d *schema.ResourceData, m interface{}) er
 	ctx := context.Background()
 	clients := m.(*config.AggregatedClient)
 
-	authorizedResource, projectId, err := expandAuthorizedResource(d)
+	authorizedResource, projectID, err := expandAuthorizedResource(d)
 	if err != nil {
 		return err
 	}
 
 	if !*authorizedResource.Authorized {
 		// flatten structure provided by user-configuration and not read from ado
-		flattenAuthorizedResource(d, authorizedResource, projectId)
+		flattenAuthorizedResource(d, authorizedResource, projectID)
 	} else {
 		// (attempt) flatten read result from ado
 		resourceRefs, err := clients.BuildClient.GetProjectResources(ctx, build.GetProjectResourcesArgs{
-			Project: &projectId,
+			Project: &projectID,
 			Type:    authorizedResource.Type,
 			Id:      authorizedResource.Id,
 		})
@@ -91,7 +97,7 @@ func resourceResourceAuthorizationRead(d *schema.ResourceData, m interface{}) er
 			return nil
 		}
 
-		flattenAuthorizedResource(d, &(*resourceRefs)[0], projectId)
+		flattenAuthorizedResource(d, &(*resourceRefs)[0], projectID)
 		return nil
 	}
 	return nil
@@ -99,18 +105,18 @@ func resourceResourceAuthorizationRead(d *schema.ResourceData, m interface{}) er
 
 func resourceResourceAuthorizationDelete(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
-	authorizedResource, projectId, err := expandAuthorizedResource(d)
+	authorizedResource, projectID, err := expandAuthorizedResource(d)
 	if err != nil {
-		return fmt.Errorf("error creating resource authorized resource: %+v", err)
+		return fmt.Errorf(msgErrorFailedResourceDelete, err)
 	}
 
 	// deletion works only by setting authorized to false
 	// because the resource to delete might have had this parameter set to true, we overwrite it
 	authorizedResource.Authorized = converter.Bool(false)
 
-	_, err = sendAuthorizedResourceToAPI(clients, authorizedResource, projectId)
+	_, err = sendAuthorizedResourceToAPI(clients, authorizedResource, projectID)
 	if err != nil {
-		return fmt.Errorf("error deleting resource authorized resource: %+v", err)
+		return fmt.Errorf(msgErrorFailedResourceDelete, err)
 	}
 
 	return err
@@ -118,14 +124,14 @@ func resourceResourceAuthorizationDelete(d *schema.ResourceData, m interface{}) 
 
 func resourceResourceAuthorizationUpdate(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*config.AggregatedClient)
-	authorizedResource, projectId, err := expandAuthorizedResource(d)
+	authorizedResource, projectID, err := expandAuthorizedResource(d)
 	if err != nil {
-		return fmt.Errorf("error creating resource authorized resource: %+v", err)
+		return fmt.Errorf(msgErrorFailedResourceUpdate, err)
 	}
 
-	_, err = sendAuthorizedResourceToAPI(clients, authorizedResource, projectId)
+	_, err = sendAuthorizedResourceToAPI(clients, authorizedResource, projectID)
 	if err != nil {
-		return fmt.Errorf("error deleting resource authorized resource: %+v", err)
+		return fmt.Errorf(msgErrorFailedResourceUpdate, err)
 	}
 
 	return resourceResourceAuthorizationRead(d, m)

@@ -5,6 +5,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/tfhelper"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/validate"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -15,18 +18,28 @@ import (
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
 )
 
+const (
+	resourceAttrAuthType            = "authorization_type"
+	resourceAttrAPIURL              = "apiserver_url"
+	resourceBlockAzSubscription     = "azure_subscription"
+	resourceBlockKubeconfig         = "kubeconfig"
+	resourceBlockServiceAccount     = "service_account"
+	serviceEndpointDataAttrAuthType = "authorizationType"
+)
+
 func makeSchemaAzureSubscription(r *schema.Resource) {
-	r.Schema["azure_subscription"] = &schema.Schema{
+	r.Schema[resourceBlockAzSubscription] = &schema.Schema{
 		Type:        schema.TypeSet,
 		Optional:    true,
 		Description: "'AzureSubscription'-type of configuration",
 		Elem: &schema.Resource{
 			Schema: map[string]*schema.Schema{
 				"azure_environment": {
-					Type:        schema.TypeString,
-					Optional:    true,
-					Default:     "AzureCloud",
-					Description: "type of azure cloud: AzureCloud",
+					Type:         schema.TypeString,
+					Optional:     true,
+					Default:      "AzureCloud",
+					Description:  "type of azure cloud: AzureCloud",
+					ValidateFunc: validation.StringInSlice([]string{"AzureCloud"}, false),
 				},
 				"cluster_name": {
 					Type:        schema.TypeString,
@@ -34,9 +47,10 @@ func makeSchemaAzureSubscription(r *schema.Resource) {
 					Description: "name of aks-resource",
 				},
 				"subscription_id": {
-					Type:        schema.TypeString,
-					Required:    true,
-					Description: "id of azure subscription",
+					Type:         schema.TypeString,
+					Required:     true,
+					Description:  "id of azure subscription",
+					ValidateFunc: validation.IsUUID,
 				},
 				"subscription_name": {
 					Type:        schema.TypeString,
@@ -44,9 +58,10 @@ func makeSchemaAzureSubscription(r *schema.Resource) {
 					Description: "name of azure subscription",
 				},
 				"tenant_id": {
-					Type:        schema.TypeString,
-					Required:    true,
-					Description: "id of aad-tenant",
+					Type:         schema.TypeString,
+					Required:     true,
+					Description:  "id of aad-tenant",
+					ValidateFunc: validation.IsUUID,
 				},
 				"resourcegroup_id": {
 					Type:        schema.TypeString,
@@ -65,63 +80,79 @@ func makeSchemaAzureSubscription(r *schema.Resource) {
 }
 
 func makeSchemaKubeconfig(r *schema.Resource) {
-	r.Schema["kubeconfig"] = &schema.Schema{
+	resourceElemSchema := &schema.Resource{
+		Schema: map[string]*schema.Schema{
+			"kube_config": {
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "Content of the kubeconfig file. The configuration information in your kubeconfig file allows Kubernetes clients to talk to your Kubernetes API servers. This file is used by kubectl and all supported Kubernetes clients.",
+			},
+			"cluster_context": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Context of your cluster",
+			},
+			"accept_untrusted_certs": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     true,
+				Description: "Enable this if your authentication uses untrusted certificates",
+			},
+		},
+	}
+	crud.MakeProtectedSchema(resourceElemSchema, "kube_config", "AZDO_KUBERNETES_SERVICE_CONNECTION_KUBECONFIG", "Content of the kubeconfig file. The configuration information in your kubeconfig file allows Kubernetes clients to talk to your Kubernetes API servers. This file is used by kubectl and all supported Kubernetes clients.")
+	r.Schema[resourceBlockKubeconfig] = &schema.Schema{
 		Type:        schema.TypeSet,
 		Optional:    true,
 		Description: "'Kubeconfig'-type of configuration",
-		Elem: &schema.Resource{
-			Schema: map[string]*schema.Schema{
-				"kube_config": {
-					Type:        schema.TypeString,
-					Required:    true,
-					Description: "Content of the kubeconfig file. The configuration information in your kubeconfig file allows Kubernetes clients to talk to your Kubernetes API servers. This file is used by kubectl and all supported Kubernetes clients.",
-				},
-				"cluster_context": {
-					Type:        schema.TypeString,
-					Optional:    true,
-					Description: "Context of your cluster",
-				},
-				"accept_untrusted_certs": {
-					Type:        schema.TypeBool,
-					Optional:    true,
-					Default:     true,
-					Description: "Enable this if your authentication uses untrusted certificates",
-				},
-			},
-		},
+		Elem:        resourceElemSchema,
 	}
 }
 
 func makeSchemaServiceAccount(r *schema.Resource) {
-	r.Schema["service_account"] = &schema.Schema{
-		Type:        schema.TypeSet,
-		Optional:    true,
-		Description: "'ServiceAccount'-type of configuration",
-		Elem: &schema.Resource{
-			Schema: map[string]*schema.Schema{
-				"token": {
-					Type:        schema.TypeString,
-					Required:    true,
-					Description: "Secret token",
+	resourceElemSchema := &schema.Resource{
+		Schema: map[string]*schema.Schema{
+			"ca_cert": {
+				Type:         schema.TypeString,
+				Sensitive:    true,
+				Optional:     true,
+				Description:  "Service account certificate",
+				ValidateFunc: validate.NoEmptyStrings,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					return true
 				},
-				"ca_cert": {
-					Type:        schema.TypeString,
-					Required:    true,
-					Description: "Service account certificate",
+			},
+			"token": {
+				Type:         schema.TypeString,
+				Sensitive:    true,
+				Optional:     true,
+				Description:  "Token",
+				ValidateFunc: validate.NoEmptyStrings,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					return true
 				},
 			},
 		},
+	}
+	crud.MakeProtectedSchema(resourceElemSchema, "ca_cert", "AZDO_KUBERNETES_SERVICE_CONNECTION_SERVICE_ACCOUNT_CERT", "Secret cert")
+	crud.MakeProtectedSchema(resourceElemSchema, "token", "AZDO_KUBERNETES_SERVICE_CONNECTION_SERVICE_ACCOUNT_TOKEN", "Secret token")
+	r.Schema[resourceBlockServiceAccount] = &schema.Schema{
+		Type:        schema.TypeSet,
+		Optional:    true,
+		Description: "'ServiceAccount'-type of configuration",
+		Elem:        resourceElemSchema,
 	}
 }
 
 func resourceServiceEndpointKubernetes() *schema.Resource {
 	r := crud.GenBaseServiceEndpointResource(flattenServiceEndpointKubernetes, expandServiceEndpointKubernetes, parseImportedProjectIDAndServiceEndpointID)
-	r.Schema["apiserver_url"] = &schema.Schema{
-		Type:        schema.TypeString,
-		Required:    true,
-		Description: "URL to Kubernete's API-Server",
+	r.Schema[resourceAttrAPIURL] = &schema.Schema{
+		Type:         schema.TypeString,
+		Required:     true,
+		Description:  "URL to Kubernete's API-Server",
+		ValidateFunc: validation.IsURLWithHTTPorHTTPS,
 	}
-	r.Schema["authorization_type"] = &schema.Schema{
+	r.Schema[resourceAttrAuthType] = &schema.Schema{
 		Type:         schema.TypeString,
 		Required:     true,
 		Description:  "Type of credentials to use",
@@ -138,11 +169,11 @@ func resourceServiceEndpointKubernetes() *schema.Resource {
 func expandServiceEndpointKubernetes(d *schema.ResourceData) (*serviceendpoint.ServiceEndpoint, *string, error) {
 	serviceEndpoint, projectID := crud.DoBaseExpansion(d)
 	serviceEndpoint.Type = converter.String("kubernetes")
-	serviceEndpoint.Url = converter.String(d.Get("apiserver_url").(string))
+	serviceEndpoint.Url = converter.String(d.Get(resourceAttrAPIURL).(string))
 
-	switch d.Get("authorization_type").(string) {
+	switch d.Get(resourceAttrAuthType).(string) {
 	case "AzureSubscription":
-		configurationRaw := d.Get("azure_subscription").(*schema.Set).List()
+		configurationRaw := d.Get(resourceBlockAzSubscription).(*schema.Set).List()
 		configuration := configurationRaw[0].(map[string]interface{})
 		serviceEndpoint.Authorization = &serviceendpoint.EndpointAuthorization{
 			Parameters: &map[string]string{
@@ -161,7 +192,7 @@ func expandServiceEndpointKubernetes(d *schema.ResourceData) (*serviceendpoint.S
 			"namespace":             configuration["namespace"].(string),
 		}
 	case "Kubeconfig":
-		configurationRaw := d.Get("kubeconfig").(*schema.Set).List()
+		configurationRaw := d.Get(resourceBlockKubeconfig).(*schema.Set).List()
 		configuration := configurationRaw[0].(map[string]interface{})
 
 		clusterContextInput := configuration["cluster_context"].(string)
@@ -190,7 +221,7 @@ func expandServiceEndpointKubernetes(d *schema.ResourceData) (*serviceendpoint.S
 			"acceptUntrustedCerts": fmt.Sprintf("%v", configuration["accept_untrusted_certs"].(bool)),
 		}
 	case "ServiceAccount":
-		configurationRaw := d.Get("service_account").(*schema.Set).List()
+		configurationRaw := d.Get(resourceBlockServiceAccount).(*schema.Set).List()
 		configuration := configurationRaw[0].(map[string]interface{})
 
 		serviceEndpoint.Authorization = &serviceendpoint.EndpointAuthorization{
@@ -204,7 +235,6 @@ func expandServiceEndpointKubernetes(d *schema.ResourceData) (*serviceendpoint.S
 		serviceEndpoint.Data = &map[string]string{
 			"authorizationType": "ServiceAccount",
 		}
-
 	}
 
 	return serviceEndpoint, projectID, nil
@@ -213,16 +243,11 @@ func expandServiceEndpointKubernetes(d *schema.ResourceData) (*serviceendpoint.S
 // Convert AzDO data structure to internal Terraform data structure
 func flattenServiceEndpointKubernetes(d *schema.ResourceData, serviceEndpoint *serviceendpoint.ServiceEndpoint, projectID *string) {
 	crud.DoBaseFlattening(d, serviceEndpoint, projectID)
-	d.Set("authorization_type", (*serviceEndpoint.Data)["authorizationType"])
-	d.Set("apiserver_url", (*serviceEndpoint.Url))
+	d.Set(resourceAttrAuthType, (*serviceEndpoint.Data)[serviceEndpointDataAttrAuthType])
+	d.Set(resourceAttrAPIURL, (*serviceEndpoint.Url))
 
-	switch (*serviceEndpoint.Data)["authorizationType"] {
+	switch (*serviceEndpoint.Data)[serviceEndpointDataAttrAuthType] {
 	case "AzureSubscription":
-		azureSubscriptionResource := &schema.Resource{
-			Schema: map[string]*schema.Schema{},
-		}
-		makeSchemaAzureSubscription(azureSubscriptionResource)
-
 		clusterIDSplit := strings.Split((*serviceEndpoint.Data)["clusterId"], "/")
 		var clusterNameIndex int
 		var resourceGroupIDIndex int
@@ -234,51 +259,52 @@ func flattenServiceEndpointKubernetes(d *schema.ResourceData, serviceEndpoint *s
 				clusterNameIndex = k + 1
 			}
 		}
-		configItems := []interface{}{
-			map[string]interface{}{
-				"azure_environment": (*serviceEndpoint.Authorization.Parameters)["azureEnvironment"],
-				"tenant_id":         (*serviceEndpoint.Authorization.Parameters)["azureTenantId"],
-				"subscription_id":   (*serviceEndpoint.Data)["azureSubscriptionId"],
-				"subscription_name": (*serviceEndpoint.Data)["azureSubscriptionName"],
-				"cluster_name":      clusterIDSplit[clusterNameIndex],
-				"resourcegroup_id":  clusterIDSplit[resourceGroupIDIndex],
-				"namespace":         (*serviceEndpoint.Data)["namespace"],
-			},
+		configItems := map[string]interface{}{
+			"azure_environment": (*serviceEndpoint.Authorization.Parameters)["azureEnvironment"],
+			"tenant_id":         (*serviceEndpoint.Authorization.Parameters)["azureTenantId"],
+			"subscription_id":   (*serviceEndpoint.Data)["azureSubscriptionId"],
+			"subscription_name": (*serviceEndpoint.Data)["azureSubscriptionName"],
+			"cluster_name":      clusterIDSplit[clusterNameIndex],
+			"resourcegroup_id":  clusterIDSplit[resourceGroupIDIndex],
+			"namespace":         (*serviceEndpoint.Data)["namespace"],
 		}
+		configItemList := make([]map[string]interface{}, 1)
+		configItemList[0] = configItems
 
-		azureSubscriptionSchemaSet := schema.NewSet(schema.HashResource(azureSubscriptionResource), configItems)
-		d.Set("azure_subscription", azureSubscriptionSchemaSet)
+		d.Set(resourceBlockAzSubscription, configItemList)
 	case "Kubeconfig":
-		kubeconfigResource := &schema.Resource{
-			Schema: map[string]*schema.Schema{},
-		}
-		makeSchemaKubeconfig(kubeconfigResource)
+		var kubeconfig map[string]interface{}
+		kubeconfigSet := d.Get("kubeconfig").(*schema.Set).List()
 
+		configuration := kubeconfigSet[0].(map[string]interface{})
+		newHashKubeconfig, hashKeyKubeconfig := tfhelper.HelpFlattenSecretNested(d, resourceBlockKubeconfig, configuration, "kube_config")
 		acceptUntrustedCerts, _ := strconv.ParseBool((*serviceEndpoint.Data)["acceptUntrustedCerts"])
-		configItems := []interface{}{
-			map[string]interface{}{
-				"kube_config":            (*serviceEndpoint.Authorization.Parameters)["kubeconfig"],
-				"cluster_context":        (*serviceEndpoint.Authorization.Parameters)["clusterContext"],
-				"accept_untrusted_certs": acceptUntrustedCerts,
-			},
+		kubeconfig = map[string]interface{}{
+			"kube_config":            configuration["kube_config"].(string),
+			"cluster_context":        (*serviceEndpoint.Authorization.Parameters)["clusterContext"],
+			"accept_untrusted_certs": acceptUntrustedCerts,
+			hashKeyKubeconfig:        newHashKubeconfig,
 		}
 
-		kubeConfigSchemaSet := schema.NewSet(schema.HashResource(kubeconfigResource), configItems)
-		d.Set("kubeconfig", kubeConfigSchemaSet)
+		kubeconfigList := make([]map[string]interface{}, 1)
+		kubeconfigList[0] = kubeconfig
+		d.Set(resourceBlockKubeconfig, kubeconfigList)
 	case "ServiceAccount":
-		serviceAccountResource := &schema.Resource{
-			Schema: map[string]*schema.Schema{},
-		}
-		makeSchemaServiceAccount(serviceAccountResource)
+		var serviceAccount map[string]interface{}
+		serviceAccountSet := d.Get("service_account").(*schema.Set).List()
 
-		configItems := []interface{}{
-			map[string]interface{}{
-				"token":   (*serviceEndpoint.Authorization.Parameters)["apiToken"],
-				"ca_cert": (*serviceEndpoint.Authorization.Parameters)["serviceAccountCertificate"],
-			},
+		configuration := serviceAccountSet[0].(map[string]interface{})
+		newHashToken, hashKeyToken := tfhelper.HelpFlattenSecretNested(d, resourceBlockServiceAccount, configuration, "token")
+		newHashCert, hashKeyCert := tfhelper.HelpFlattenSecretNested(d, resourceBlockServiceAccount, configuration, "ca_cert")
+		serviceAccount = map[string]interface{}{
+			"token":      configuration["token"].(string),
+			"ca_cert":    configuration["ca_cert"].(string),
+			hashKeyToken: newHashToken,
+			hashKeyCert:  newHashCert,
 		}
 
-		serviceAccountSchemaSet := schema.NewSet(schema.HashResource(serviceAccountResource), configItems)
-		d.Set("service_account", serviceAccountSchemaSet)
+		serviceAccountList := make([]map[string]interface{}, 1)
+		serviceAccountList[0] = serviceAccount
+		d.Set(resourceBlockServiceAccount, serviceAccountList)
 	}
 }

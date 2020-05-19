@@ -12,6 +12,7 @@ import (
 func Provider() *schema.Provider {
 	p := &schema.Provider{
 		ResourcesMap: map[string]*schema.Resource{
+			"azuredevops_resource_authorization":      resourceResourceAuthorization(),
 			"azuredevops_build_definition":            resourceBuildDefinition(),
 			"azuredevops_project":                     resourceProject(),
 			"azuredevops_project_features":            resourceProjectFeatures(),
@@ -29,7 +30,6 @@ func Provider() *schema.Provider {
 			"azuredevops_group":                       resourceGroup(),
 			"azuredevops_project_permissions":         resourceProjectPermissions(),
 			"azuredevops_git_permissions":             resourceGitPermissions(),
-			"azuredevops_resource_authorization":      resourceResourceAuthorization(),
 			"azuredevops_area_permissions":            resourceAreaPermissions(),
 			"azuredevops_iteration_permissions":       resourceIterationPermissions(),
 		},

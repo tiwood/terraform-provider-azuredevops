@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/config"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/converter"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/utils/suppress"
 )
 
 func resourceGroupMembership() *schema.Resource {
@@ -30,9 +31,10 @@ func resourceGroupMembership() *schema.Resource {
 				ValidateFunc: validation.NoZeroValues,
 			},
 			"mode": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "add",
+				Type:             schema.TypeString,
+				Optional:         true,
+				Default:          "add",
+				DiffSuppressFunc: suppress.CaseDifference,
 				ValidateFunc: validation.StringInSlice([]string{
 					"add", "overwrite",
 				}, true),
@@ -114,9 +116,6 @@ func resourceGroupMembershipCreate(d *schema.ResourceData, m interface{}) error 
 }
 
 func resourceGroupMembershipUpdate(d *schema.ResourceData, m interface{}) error {
-	// Enable partial state mode
-	d.Partial(true)
-
 	if !d.HasChange("members") {
 		return nil
 	}
@@ -134,10 +133,6 @@ func resourceGroupMembershipUpdate(d *schema.ResourceData, m interface{}) error 
 	if err != nil {
 		return err
 	}
-
-	// We succeeded, disable partial mode. This causes Terraform to save
-	// all fields again.
-	d.Partial(false)
 
 	stateConf := &resource.StateChangeConf{
 		Pending: []string{"Waiting"},

@@ -5,9 +5,8 @@ import (
 	"strings"
 )
 
-// TestAccAzureGitRepoResource HCL describing an AzDO GIT repository resource
-func TestAccAzureGitRepoResource(projectName string, gitRepoName string, initType string) string {
-	azureGitRepoResource := fmt.Sprintf(`
+func getAzureGitRepoResource(gitRepoName string, initType string) string {
+	return fmt.Sprintf(`
 resource "azuredevops_git_repository" "gitrepo" {
 	project_id      = azuredevops_project.project.id
 	name            = "%s"
@@ -15,6 +14,11 @@ resource "azuredevops_git_repository" "gitrepo" {
 		init_type = "%s"
 	}
 }`, gitRepoName, initType)
+}
+
+// TestAccAzureGitRepoResource HCL describing an AzDO GIT repository resource
+func TestAccAzureGitRepoResource(projectName string, gitRepoName string, initType string) string {
+	azureGitRepoResource := getAzureGitRepoResource(gitRepoName, initType)
 
 	projectResource := TestAccProjectResource(projectName)
 	return fmt.Sprintf("%s\n%s", projectResource, azureGitRepoResource)
@@ -23,15 +27,14 @@ resource "azuredevops_git_repository" "gitrepo" {
 // TestAccAzureForkedGitRepoResource HCL describing an AzDO GIT repository resource
 func TestAccAzureForkedGitRepoResource(projectName string, gitRepoName string, gitForkedRepoName string, initType string, forkedInitType string) string {
 	azureGitRepoResource := fmt.Sprintf(`
-resource "azuredevops_git_repository" "gitforkedrepo" {
-	project_id      		= azuredevops_project.project.id
-	parent_repository_id    = azuredevops_git_repository.gitrepo.id
-	name            		= "%s"
-	initialization {
-		init_type = "%s"
-	}
-}`, gitForkedRepoName, forkedInitType)
-
+	resource "azuredevops_git_repository" "gitforkedrepo" {
+		project_id      		= azuredevops_project.project.id
+		parent_repository_id    = azuredevops_git_repository.gitrepo.id
+		name            		= "%s"
+		initialization {
+			init_type = "%s"
+		}
+	}`, gitForkedRepoName, forkedInitType)
 	gitRepoResource := TestAccAzureGitRepoResource(projectName, gitRepoName, initType)
 	return fmt.Sprintf("%s\n%s", gitRepoResource, azureGitRepoResource)
 }
@@ -71,6 +74,19 @@ data "azuredevops_project" "project" {
 }`, projectName)
 }
 
+// TestAccProjectGitRepositories HCL describing a data source for an AzDO git repo
+func TestAccProjectGitRepositories(projectName string, gitRepoName string) string {
+	return fmt.Sprintf(`
+data "azuredevops_project" "project" {
+	project_name = "%s"
+}
+
+data "azuredevops_git_repositories" "repositories" {
+	project_id = data.azuredevops_project.project.id
+	name = "%s"
+}`, projectName, gitRepoName)
+}
+
 // TestAccUserEntitlementResource HCL describing an AzDO UserEntitlement
 func TestAccUserEntitlementResource(principalName string) string {
 	return fmt.Sprintf(`
@@ -106,14 +122,73 @@ resource "azuredevops_serviceendpoint_dockerhub" "serviceendpoint" {
 	return fmt.Sprintf("%s\n%s", projectResource, serviceEndpointResource)
 }
 
-// TestAccServiceEndpointKubernetesResource HCL describing an AzDO service endpoint
-func TestAccServiceEndpointKubernetesResource(projectName string, serviceEndpointName string) string {
-	serviceEndpointResource := fmt.Sprintf(`
+// TestAccServiceEndpointKubernetesResource HCL describing an AzDO kubernetes service endpoint
+func TestAccServiceEndpointKubernetesResource(projectName string, serviceEndpointName string, authorizationType string) string {
+	var serviceEndpointResource string
+	switch authorizationType {
+	case "AzureSubscription":
+		serviceEndpointResource = fmt.Sprintf(`
 resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
 	project_id             = azuredevops_project.project.id
 	service_endpoint_name  = "%s"
+	apiserver_url = "https://sample-kubernetes-cluster.hcp.westeurope.azmk8s.io"
+	authorization_type = "AzureSubscription"
+	azure_subscription {
+		subscription_id = "8a7aace5-66b1-66b1-66b1-8968a070edd2"
+		subscription_name = "Microsoft Azure DEMO"
+		tenant_id = "2e3a33f9-66b1-66b1-66b1-8968a070edd2"
+		resourcegroup_id = "sample-rg"
+		namespace = "default"
+		cluster_name = "sample-aks"
+	}
 }`, serviceEndpointName)
-
+	case "ServiceAccount":
+		serviceEndpointResource = fmt.Sprintf(`
+resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
+	project_id            = azuredevops_project.project.id
+	service_endpoint_name = "%s"
+	apiserver_url         = "https://sample-kubernetes-cluster.hcp.westeurope.azmk8s.io"
+	authorization_type    = "ServiceAccount"
+	service_account {
+	  token   = "kubernetes_TEST_api_token"
+	  ca_cert = "kubernetes_TEST_ca_cert"
+	}
+}`, serviceEndpointName)
+	case "Kubeconfig":
+		serviceEndpointResource = fmt.Sprintf(`
+resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
+	project_id            = azuredevops_project.project.id
+	service_endpoint_name = "%s"
+	apiserver_url         = "https://sample-kubernetes-cluster.hcp.westeurope.azmk8s.io"
+	authorization_type    = "Kubeconfig"
+	kubeconfig {
+		kube_config            = <<EOT
+								apiVersion: v1
+								clusters:
+								- cluster:
+									certificate-authority: fake-ca-file
+									server: https://1.2.3.4
+								name: development
+								contexts:
+								- context:
+									cluster: development
+									namespace: frontend
+									user: developer
+								name: dev-frontend
+								current-context: dev-frontend
+								kind: Config
+								preferences: {}
+								users:
+								- name: developer
+								user:
+									client-certificate: fake-cert-file
+									client-key: fake-key-file
+								EOT
+		accept_untrusted_certs = true
+		cluster_context        = "dev-frontend"
+	}
+}`, serviceEndpointName)
+	}
 	projectResource := TestAccProjectResource(projectName)
 	return fmt.Sprintf("%s\n%s", projectResource, serviceEndpointResource)
 }
@@ -124,12 +199,29 @@ func TestAccServiceEndpointAzureRMResource(projectName string, serviceEndpointNa
 resource "azuredevops_serviceendpoint_azurerm" "serviceendpointrm" {
 	project_id             = azuredevops_project.project.id
 	service_endpoint_name  = "%s"
-	azurerm_spn_clientid 	="e318e66b-ec4b-4dff-9124-41129b9d7150"
+	credentials {
+		serviceprincipalid 	="e318e66b-ec4b-4dff-9124-41129b9d7150"
+		serviceprincipalkey ="d9d210dd-f9f0-4176-afb8-a4df60e1ae72"
+	}
 	azurerm_spn_tenantid      = "9c59cbe5-2ca1-4516-b303-8968a070edd2"
     azurerm_subscription_id   = "3b0fee91-c36d-4d70-b1e9-fc4b9d608c3d"
     azurerm_subscription_name = "Microsoft Azure DEMO"
-    azurerm_scope             = "/subscriptions/3b0fee91-c36d-4d70-b1e9-fc4b9d608c3d"
-	azurerm_spn_clientsecret ="d9d210dd-f9f0-4176-afb8-a4df60e1ae72"
+
+}`, serviceEndpointName)
+
+	projectResource := TestAccProjectResource(projectName)
+	return fmt.Sprintf("%s\n%s", projectResource, serviceEndpointResource)
+}
+
+// TestAccServiceEndpointAzureRMAutomaticResource HCL describing an AzDO service endpoint
+func TestAccServiceEndpointAzureRMAutomaticResource(projectName string, serviceEndpointName string) string {
+	serviceEndpointResource := fmt.Sprintf(`
+resource "azuredevops_serviceendpoint_azurerm" "serviceendpointrm" {
+	project_id             = azuredevops_project.project.id
+	service_endpoint_name  = "%s"
+	azurerm_spn_tenantid      = "9c59cbe5-2ca1-4516-b303-8968a070edd2"
+    azurerm_subscription_id   = "3b0fee91-c36d-4d70-b1e9-fc4b9d608c3d"
+    azurerm_subscription_name = "Microsoft Azure DEMO"
 
 }`, serviceEndpointName)
 
@@ -201,6 +293,7 @@ func TestAccBuildDefinitionResourceGitHub(projectName string, buildDefinitionNam
 		buildPath,
 		"GitHub",
 		"repoOrg/repoName",
+		"repoOrg/repoName",
 		"master",
 		"path/to/yaml",
 		"")
@@ -214,9 +307,28 @@ func TestAccBuildDefinitionResourceBitbucket(projectName string, buildDefinition
 		buildPath,
 		"Bitbucket",
 		"repoOrg/repoName",
+		"repoOrg/repoName",
 		"master",
 		"path/to/yaml",
 		serviceConnectionID)
+}
+
+// TestAccBuildDefinitionResourceTfsGit HCL describing an AzDO build definition sourced from AzDo Git Repo
+func TestAccBuildDefinitionResourceTfsGit(projectName string, gitRepoName string, buildDefinitionName string, buildPath string) string {
+	buildDefinitionResource := TestAccBuildDefinitionResource(
+		projectName,
+		buildDefinitionName,
+		buildPath,
+		"TfsGit",
+		"${azuredevops_git_repository.gitrepo.id}",
+		"${azuredevops_git_repository.gitrepo.name}",
+		"master",
+		"path/to/yaml",
+		"")
+
+	azureGitRepoResource := getAzureGitRepoResource(gitRepoName, "Clean")
+
+	return fmt.Sprintf("%s\n%s", azureGitRepoResource, buildDefinitionResource)
 }
 
 // TestAccBuildDefinitionResource HCL describing an AzDO build definition
@@ -225,6 +337,7 @@ func TestAccBuildDefinitionResource(
 	buildDefinitionName string,
 	buildPath string,
 	repoType string,
+	repoID string,
 	repoName string,
 	branchName string,
 	yamlPath string,
@@ -233,11 +346,12 @@ func TestAccBuildDefinitionResource(
 	repositoryBlock := fmt.Sprintf(`
 repository {
 	repo_type             = "%s"
+	repo_id               = "%s"
 	repo_name             = "%s"
 	branch_name           = "%s"
 	yml_path              = "%s"
 	service_connection_id = "%s"
-}`, repoType, repoName, branchName, yamlPath, serviceConnectionID)
+}`, repoType, repoID, repoName, branchName, yamlPath, serviceConnectionID)
 
 	buildDefinitionResource := fmt.Sprintf(`
 resource "azuredevops_build_definition" "build" {

@@ -24,70 +24,94 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
 )
 
+const kubernetesApiserverUrl = "https://kubernetes.apiserver.com/"
+const terraformServiceEndpointNode = "azuredevops_serviceendpoint_kubernetes.serviceendpoint"
+
+const errMsgCreateServiceEndpoint = "CreateServiceEndpoint() Failed"
+const errMsgUpdateServiceEndpoint = "UpdateServiceEndpoint() Failed"
+const errMsgGetServiceEndpoint = "GetServiceEndpoint() Failed"
+const errMsgDeleteServiceEndpoint = "DeleteServiceEndpoint() Failed"
+
 var kubernetesTestServiceEndpointID = uuid.New()
 var kubernetesRandomServiceEndpointProjectID = uuid.New().String()
 var kubernetesTestServiceEndpointProjectID = &kubernetesRandomServiceEndpointProjectID
 
-var kubernetesTestServiceEndpointForAzureSubscription = serviceendpoint.ServiceEndpoint{ //todo change
-	Authorization: &serviceendpoint.EndpointAuthorization{
-		Parameters: &map[string]string{
-			"azureEnvironment": "AzureCloud",
-			"azureTenantId":    "kubernetes_TEST_tenant_id",
-		},
-		Scheme: converter.String("Kubernetes"),
-	},
-	Data: &map[string]string{
+var kubernetesTestServiceEndpoint = serviceendpoint.ServiceEndpoint{
+	Authorization: &serviceendpoint.EndpointAuthorization{},
+	Id:            &kubernetesTestServiceEndpointID,
+	Name:          converter.String("UNIT_TEST_CONN_NAME"),
+	Owner:         converter.String("library"), // Supported values are "library", "agentcloud"
+	Type:          converter.String("kubernetes"),
+	Url:           converter.String(kubernetesApiserverUrl),
+	Description:   converter.String("description"),
+}
+
+func createkubernetesTestServiceEndpointForAzureSubscription() *serviceendpoint.ServiceEndpoint {
+	serviceEndpoint := kubernetesTestServiceEndpoint
+	serviceEndpoint.Authorization.Scheme = converter.String("Kubernetes")
+	serviceEndpoint.Authorization.Parameters = &map[string]string{
+		"azureEnvironment": "AzureCloud",
+		"azureTenantId":    "kubernetes_TEST_tenant_id",
+	}
+	serviceEndpoint.Data = &map[string]string{
 		"authorizationType":     "AzureSubscription",
 		"azureSubscriptionId":   "kubernetes_TEST_subscription_id",
 		"azureSubscriptionName": "kubernetes_TEST_subscription_name",
 		"clusterId":             "/subscriptions/kubernetes_TEST_subscription_id/resourcegroups/kubernetes_TEST_resource_group_id/providers/Microsoft.ContainerService/managedClusters/kubernetes_TEST_cluster_name",
 		"namespace":             "default",
-	},
-	Id:          &kubernetesTestServiceEndpointID,
-	Name:        converter.String("UNIT_TEST_CONN_NAME"),
-	Owner:       converter.String("library"), // Supported values are "library", "agentcloud"
-	Type:        converter.String("kubernetes"),
-	Url:         converter.String("https://kubernetes.apiserver.com/"),
-	Description: converter.String("description"),
+	}
+
+	return &serviceEndpoint
 }
 
-var kubernetesTestServiceEndpointForKubeconfig = serviceendpoint.ServiceEndpoint{ //todo change
-	Authorization: &serviceendpoint.EndpointAuthorization{
-		Parameters: &map[string]string{
-			"clusterContext": "kubernetes_TEST_cluster_context",
-			"kubeconfig":     "kubernetes_TEST_tenant_id",
-		},
-		Scheme: converter.String("Kubernetes"),
-	},
-	Data: &map[string]string{
+func createkubernetesTestServiceEndpointForKubeconfig() *serviceendpoint.ServiceEndpoint {
+	serviceEndpoint := kubernetesTestServiceEndpoint
+	serviceEndpoint.Authorization.Scheme = converter.String("Kubernetes")
+	serviceEndpoint.Authorization.Parameters = &map[string]string{
+		"kubeconfig": `<<EOT
+							apiVersion: v1
+							clusters:
+							- cluster:
+							certificate-authority: fake-ca-file
+							server: https://1.2.3.4
+							name: development
+							contexts:
+							- context:
+							cluster: development
+							namespace: frontend
+							user: developer
+							name: dev-frontend
+							current-context: dev-frontend
+							kind: Config
+							preferences: {}
+							users:
+							- name: developer
+							user:
+							client-certificate: fake-cert-file
+							client-key: fake-key-file
+							EOT`,
+		"clusterContext": "dev-frontend",
+	}
+	serviceEndpoint.Data = &map[string]string{
 		"authorizationType":    "Kubeconfig",
 		"acceptUntrustedCerts": "true",
-	},
-	Id:          &kubernetesTestServiceEndpointID,
-	Name:        converter.String("UNIT_TEST_CONN_NAME"),
-	Owner:       converter.String("library"), // Supported values are "library", "agentcloud"
-	Type:        converter.String("kubernetes"),
-	Url:         converter.String("https://kubernetes.apiserver.com/"),
-	Description: converter.String("description"),
+	}
+
+	return &serviceEndpoint
 }
 
-var kubernetesTestServiceEndpointForServiceAccount = serviceendpoint.ServiceEndpoint{ //todo change
-	Authorization: &serviceendpoint.EndpointAuthorization{
-		Parameters: &map[string]string{
-			"apiToken":                  "kubernetes_TEST_api_token",
-			"serviceAccountCertificate": "kubernetes_TEST_ca_cert",
-		},
-		Scheme: converter.String("Token"),
-	},
-	Data: &map[string]string{
+func createkubernetesTestServiceEndpointForServiceAccount() *serviceendpoint.ServiceEndpoint {
+	serviceEndpoint := kubernetesTestServiceEndpoint
+	serviceEndpoint.Authorization.Scheme = converter.String("Token")
+	serviceEndpoint.Authorization.Parameters = &map[string]string{
+		"apiToken":                  "kubernetes_TEST_api_token",
+		"serviceAccountCertificate": "kubernetes_TEST_ca_cert",
+	}
+	serviceEndpoint.Data = &map[string]string{
 		"authorizationType": "ServiceAccount",
-	},
-	Id:          &kubernetesTestServiceEndpointID,
-	Name:        converter.String("UNIT_TEST_CONN_NAME"),
-	Owner:       converter.String("library"), // Supported values are "library", "agentcloud"
-	Type:        converter.String("kubernetes"),
-	Url:         converter.String("https://kubernetes.apiserver.com/"),
-	Description: converter.String("description"),
+	}
+
+	return &serviceEndpoint
 }
 
 /**
@@ -95,48 +119,51 @@ var kubernetesTestServiceEndpointForServiceAccount = serviceendpoint.ServiceEndp
  */
 
 // verifies that the flatten/expand round trip yields the same service endpoint for autorization type "AzureSubscription"
-func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscription_ExpandFlatten_Roundtrip(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscriptionExpandFlattenRoundtrip(t *testing.T) {
 	resourceData := schema.TestResourceDataRaw(t, resourceServiceEndpointKubernetes().Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
+	kubernetesTestServiceEndpointForAzureSubscription := createkubernetesTestServiceEndpointForAzureSubscription()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
 
 	serviceEndpointAfterRoundTrip, projectID, err := expandServiceEndpointKubernetes(resourceData)
 
 	require.Nil(t, err)
-	require.Equal(t, kubernetesTestServiceEndpointForAzureSubscription, *serviceEndpointAfterRoundTrip)
+	require.Equal(t, *kubernetesTestServiceEndpointForAzureSubscription, *serviceEndpointAfterRoundTrip)
 	require.Equal(t, kubernetesTestServiceEndpointProjectID, projectID)
 }
 
 // verifies that if an error is produced on create, the error is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscription_Create_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscriptionCreateDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
+	kubernetesTestServiceEndpointForAzureSubscription := createkubernetesTestServiceEndpointForAzureSubscription()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
 
-	expectedArgs := serviceendpoint.CreateServiceEndpointArgs{Endpoint: &kubernetesTestServiceEndpointForAzureSubscription, Project: kubernetesTestServiceEndpointProjectID}
+	expectedArgs := serviceendpoint.CreateServiceEndpointArgs{Endpoint: kubernetesTestServiceEndpointForAzureSubscription, Project: kubernetesTestServiceEndpointProjectID}
 	buildClient.
 		EXPECT().
 		CreateServiceEndpoint(clients.Ctx, expectedArgs).
-		Return(nil, errors.New("CreateServiceEndpoint() Failed")).
+		Return(nil, errors.New(errMsgCreateServiceEndpoint)).
 		Times(1)
 
 	err := r.Create(resourceData, clients)
-	require.Contains(t, err.Error(), "CreateServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgCreateServiceEndpoint)
 }
 
 // verifies that if an error is produced on a read, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscription_Read_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscriptionReadDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
+	kubernetesTestServiceEndpointForAzureSubscription := createkubernetesTestServiceEndpointForAzureSubscription()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
@@ -145,21 +172,22 @@ func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscription_Read_DoesNotSw
 	buildClient.
 		EXPECT().
 		GetServiceEndpointDetails(clients.Ctx, expectedArgs).
-		Return(nil, errors.New("GetServiceEndpoint() Failed")).
+		Return(nil, errors.New(errMsgGetServiceEndpoint)).
 		Times(1)
 
 	err := r.Read(resourceData, clients)
-	require.Contains(t, err.Error(), "GetServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgGetServiceEndpoint)
 }
 
 // verifies that if an error is produced on a delete, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscription_Delete_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscriptionDeleteDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
+	kubernetesTestServiceEndpointForAzureSubscription := createkubernetesTestServiceEndpointForAzureSubscription()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
@@ -168,27 +196,28 @@ func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscription_Delete_DoesNot
 	buildClient.
 		EXPECT().
 		DeleteServiceEndpoint(clients.Ctx, expectedArgs).
-		Return(errors.New("DeleteServiceEndpoint() Failed")).
+		Return(errors.New(errMsgDeleteServiceEndpoint)).
 		Times(1)
 
 	err := r.Delete(resourceData, clients)
-	require.Contains(t, err.Error(), "DeleteServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgDeleteServiceEndpoint)
 }
 
 // verifies that if an error is produced on an update, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscription_Update_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscriptionUpdateDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
+	kubernetesTestServiceEndpointForAzureSubscription := createkubernetesTestServiceEndpointForAzureSubscription()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForAzureSubscription, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
 
 	expectedArgs := serviceendpoint.UpdateServiceEndpointArgs{
-		Endpoint:   &kubernetesTestServiceEndpointForAzureSubscription,
+		Endpoint:   kubernetesTestServiceEndpointForAzureSubscription,
 		EndpointId: kubernetesTestServiceEndpointForAzureSubscription.Id,
 		Project:    kubernetesTestServiceEndpointProjectID,
 	}
@@ -196,55 +225,61 @@ func TestAzureDevOpsServiceEndpointKubernetesForAzureSubscription_Update_DoesNot
 	buildClient.
 		EXPECT().
 		UpdateServiceEndpoint(clients.Ctx, expectedArgs).
-		Return(nil, errors.New("UpdateServiceEndpoint() Failed")).
+		Return(nil, errors.New(errMsgUpdateServiceEndpoint)).
 		Times(1)
 
 	err := r.Update(resourceData, clients)
-	require.Contains(t, err.Error(), "UpdateServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgUpdateServiceEndpoint)
 }
 
 // verifies that the flatten/expand round trip yields the same service endpoint for autorization type "Kubeconfig"
-func TestAzureDevOpsServiceEndpointKubernetesForKubeconfig_ExpandFlatten_Roundtrip(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForKubeconfigExpandFlattenRoundtrip(t *testing.T) {
 	resourceData := schema.TestResourceDataRaw(t, resourceServiceEndpointKubernetes().Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
+	configureKubeconfig(resourceData)
+	kubernetesTestServiceEndpointForKubeconfig := createkubernetesTestServiceEndpointForKubeconfig()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
 
 	serviceEndpointAfterRoundTrip, projectID, err := expandServiceEndpointKubernetes(resourceData)
 	require.Nil(t, err)
-	require.Equal(t, kubernetesTestServiceEndpointForKubeconfig, *serviceEndpointAfterRoundTrip)
+	require.Equal(t, *kubernetesTestServiceEndpointForKubeconfig, *serviceEndpointAfterRoundTrip)
 	require.Equal(t, kubernetesTestServiceEndpointProjectID, projectID)
 }
 
 // verifies that if an error is produced on a read, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForKubeconfig_Create_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForKubeconfigCreateDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
+	configureKubeconfig(resourceData)
+	kubernetesTestServiceEndpointForKubeconfig := createkubernetesTestServiceEndpointForKubeconfig()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
 
-	expectedArgs := serviceendpoint.CreateServiceEndpointArgs{Endpoint: &kubernetesTestServiceEndpointForKubeconfig, Project: kubernetesTestServiceEndpointProjectID}
+	expectedArgs := serviceendpoint.CreateServiceEndpointArgs{Endpoint: kubernetesTestServiceEndpointForKubeconfig, Project: kubernetesTestServiceEndpointProjectID}
 	buildClient.
 		EXPECT().
 		CreateServiceEndpoint(clients.Ctx, expectedArgs).
-		Return(nil, errors.New("CreateServiceEndpoint() Failed")).
+		Return(nil, errors.New(errMsgCreateServiceEndpoint)).
 		Times(1)
 
 	err := r.Create(resourceData, clients)
-	require.Contains(t, err.Error(), "CreateServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgCreateServiceEndpoint)
 }
 
 // verifies that if an error is produced on a read, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForKubeconfig_Read_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForKubeconfigReadDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
+	configureKubeconfig(resourceData)
+	kubernetesTestServiceEndpointForKubeconfig := createkubernetesTestServiceEndpointForKubeconfig()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
@@ -253,21 +288,23 @@ func TestAzureDevOpsServiceEndpointKubernetesForKubeconfig_Read_DoesNotSwallowEr
 	buildClient.
 		EXPECT().
 		GetServiceEndpointDetails(clients.Ctx, expectedArgs).
-		Return(nil, errors.New("GetServiceEndpoint() Failed")).
+		Return(nil, errors.New(errMsgGetServiceEndpoint)).
 		Times(1)
 
 	err := r.Read(resourceData, clients)
-	require.Contains(t, err.Error(), "GetServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgGetServiceEndpoint)
 }
 
 // verifies that if an error is produced on a delete, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForKubeconfig_Delete_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForKubeconfigDeleteDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
+	configureKubeconfig(resourceData)
+	kubernetesTestServiceEndpointForKubeconfig := createkubernetesTestServiceEndpointForKubeconfig()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
@@ -276,27 +313,29 @@ func TestAzureDevOpsServiceEndpointKubernetesForKubeconfig_Delete_DoesNotSwallow
 	buildClient.
 		EXPECT().
 		DeleteServiceEndpoint(clients.Ctx, expectedArgs).
-		Return(errors.New("DeleteServiceEndpoint() Failed")).
+		Return(errors.New(errMsgDeleteServiceEndpoint)).
 		Times(1)
 
 	err := r.Delete(resourceData, clients)
-	require.Contains(t, err.Error(), "DeleteServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgDeleteServiceEndpoint)
 }
 
 // verifies that if an error is produced on an update, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForKubeconfig_Update_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForKubeconfigUpdateDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
+	configureKubeconfig(resourceData)
+	kubernetesTestServiceEndpointForKubeconfig := createkubernetesTestServiceEndpointForKubeconfig()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForKubeconfig, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
 
 	expectedArgs := serviceendpoint.UpdateServiceEndpointArgs{
-		Endpoint:   &kubernetesTestServiceEndpointForKubeconfig,
+		Endpoint:   kubernetesTestServiceEndpointForKubeconfig,
 		EndpointId: kubernetesTestServiceEndpointForKubeconfig.Id,
 		Project:    kubernetesTestServiceEndpointProjectID,
 	}
@@ -304,56 +343,62 @@ func TestAzureDevOpsServiceEndpointKubernetesForKubeconfig_Update_DoesNotSwallow
 	buildClient.
 		EXPECT().
 		UpdateServiceEndpoint(clients.Ctx, expectedArgs).
-		Return(nil, errors.New("UpdateServiceEndpoint() Failed")).
+		Return(nil, errors.New(errMsgUpdateServiceEndpoint)).
 		Times(1)
 
 	err := r.Update(resourceData, clients)
-	require.Contains(t, err.Error(), "UpdateServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgUpdateServiceEndpoint)
 }
 
 // verifies that the flatten/expand round trip yields the same service endpoint for autorization type "ServiceAccount"
-func TestAzureDevOpsServiceEndpointKubernetesForServiceAccount_ExpandFlatten_Roundtrip(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForServiceAccountExpandFlattenRoundtrip(t *testing.T) {
 	resourceData := schema.TestResourceDataRaw(t, resourceServiceEndpointKubernetes().Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
+	configureServiceAccount(resourceData)
+	kubernetesTestServiceEndpointForServiceAccount := createkubernetesTestServiceEndpointForServiceAccount()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
 
 	serviceEndpointAfterRoundTrip, projectID, err := expandServiceEndpointKubernetes(resourceData)
 
 	require.Nil(t, err)
-	require.Equal(t, kubernetesTestServiceEndpointForServiceAccount, *serviceEndpointAfterRoundTrip)
+	require.Equal(t, *kubernetesTestServiceEndpointForServiceAccount, *serviceEndpointAfterRoundTrip)
 	require.Equal(t, kubernetesTestServiceEndpointProjectID, projectID)
 }
 
 // verifies that if an error is produced on a read, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForServiceAccount_Create_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForServiceAccountCreateDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
+	configureServiceAccount(resourceData)
+	kubernetesTestServiceEndpointForServiceAccount := createkubernetesTestServiceEndpointForServiceAccount()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
 
-	expectedArgs := serviceendpoint.CreateServiceEndpointArgs{Endpoint: &kubernetesTestServiceEndpointForServiceAccount, Project: kubernetesTestServiceEndpointProjectID}
+	expectedArgs := serviceendpoint.CreateServiceEndpointArgs{Endpoint: kubernetesTestServiceEndpointForServiceAccount, Project: kubernetesTestServiceEndpointProjectID}
 	buildClient.
 		EXPECT().
 		CreateServiceEndpoint(clients.Ctx, expectedArgs).
-		Return(nil, errors.New("CreateServiceEndpoint() Failed")).
+		Return(nil, errors.New(errMsgCreateServiceEndpoint)).
 		Times(1)
 
 	err := r.Create(resourceData, clients)
-	require.Contains(t, err.Error(), "CreateServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgCreateServiceEndpoint)
 }
 
 // verifies that if an error is produced on a read, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForServiceAccount_Read_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForServiceAccountReadDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
+	configureServiceAccount(resourceData)
+	kubernetesTestServiceEndpointForServiceAccount := createkubernetesTestServiceEndpointForServiceAccount()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
@@ -362,21 +407,23 @@ func TestAzureDevOpsServiceEndpointKubernetesForServiceAccount_Read_DoesNotSwall
 	buildClient.
 		EXPECT().
 		GetServiceEndpointDetails(clients.Ctx, expectedArgs).
-		Return(nil, errors.New("GetServiceEndpoint() Failed")).
+		Return(nil, errors.New(errMsgGetServiceEndpoint)).
 		Times(1)
 
 	err := r.Read(resourceData, clients)
-	require.Contains(t, err.Error(), "GetServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgGetServiceEndpoint)
 }
 
 // verifies that if an error is produced on a delete, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForServiceAccount_Delete_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForServiceAccountDeleteDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
+	configureServiceAccount(resourceData)
+	kubernetesTestServiceEndpointForServiceAccount := createkubernetesTestServiceEndpointForServiceAccount()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
@@ -385,27 +432,29 @@ func TestAzureDevOpsServiceEndpointKubernetesForServiceAccount_Delete_DoesNotSwa
 	buildClient.
 		EXPECT().
 		DeleteServiceEndpoint(clients.Ctx, expectedArgs).
-		Return(errors.New("DeleteServiceEndpoint() Failed")).
+		Return(errors.New(errMsgDeleteServiceEndpoint)).
 		Times(1)
 
 	err := r.Delete(resourceData, clients)
-	require.Contains(t, err.Error(), "DeleteServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgDeleteServiceEndpoint)
 }
 
 // verifies that if an error is produced on an update, it is not swallowed
-func TestAzureDevOpsServiceEndpointKubernetesForServiceAccount_Update_DoesNotSwallowError(t *testing.T) {
+func TestAzureDevOpsServiceEndpointKubernetesForServiceAccountUpdateDoesNotSwallowError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	r := resourceServiceEndpointKubernetes()
 	resourceData := schema.TestResourceDataRaw(t, r.Schema, nil)
-	flattenServiceEndpointKubernetes(resourceData, &kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
+	configureServiceAccount(resourceData)
+	kubernetesTestServiceEndpointForServiceAccount := createkubernetesTestServiceEndpointForServiceAccount()
+	flattenServiceEndpointKubernetes(resourceData, kubernetesTestServiceEndpointForServiceAccount, kubernetesTestServiceEndpointProjectID)
 
 	buildClient := azdosdkmocks.NewMockServiceendpointClient(ctrl)
 	clients := &config.AggregatedClient{ServiceEndpointClient: buildClient, Ctx: context.Background()}
 
 	expectedArgs := serviceendpoint.UpdateServiceEndpointArgs{
-		Endpoint:   &kubernetesTestServiceEndpointForServiceAccount,
+		Endpoint:   kubernetesTestServiceEndpointForServiceAccount,
 		EndpointId: kubernetesTestServiceEndpointForServiceAccount.Id,
 		Project:    kubernetesTestServiceEndpointProjectID,
 	}
@@ -413,11 +462,11 @@ func TestAzureDevOpsServiceEndpointKubernetesForServiceAccount_Update_DoesNotSwa
 	buildClient.
 		EXPECT().
 		UpdateServiceEndpoint(clients.Ctx, expectedArgs).
-		Return(nil, errors.New("UpdateServiceEndpoint() Failed")).
+		Return(nil, errors.New(errMsgUpdateServiceEndpoint)).
 		Times(1)
 
 	err := r.Update(resourceData, clients)
-	require.Contains(t, err.Error(), "UpdateServiceEndpoint() Failed")
+	require.Contains(t, err.Error(), errMsgUpdateServiceEndpoint)
 }
 
 /**
@@ -426,124 +475,79 @@ func TestAzureDevOpsServiceEndpointKubernetesForServiceAccount_Update_DoesNotSwa
 
 // validates that an apply followed by another apply (i.e., resource update) will be reflected in AzDO and the
 // underlying terraform state.
-func TestAccAzureDevOpsServiceEndpointKubernetesForAzureSubscription_CreateAndUpdate(t *testing.T) {
-	projectName := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	serviceEndpointNameFirst := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	serviceEndpointNameSecond := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+func TestAccAzureDevOpsServiceEndpointKubernetesForAzureSubscriptionCreateAndUpdate(t *testing.T) {
+	authorizationType := "AzureSubscription"
 
-	tfSvcEpNode := "azuredevops_serviceendpoint_kubernetes.serviceendpoint"
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testhelper.TestAccPreCheck(t, nil) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccServiceEndpointKubernetesCheckDestroy,
-		Steps: []resource.TestStep{
-			{
-				Config: testhelper.TestAccServiceEndpointKubernetesResource(projectName, serviceEndpointNameFirst),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "project_id"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "authorizationType"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "azureEnvironment"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "azureTenantId"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "azureSubscriptionId"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "azureSubscriptionName"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "clusterId"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "namespace"),
-					resource.TestCheckResourceAttr(tfSvcEpNode, "service_endpoint_name", serviceEndpointNameFirst),
-					testAccCheckServiceEndpointKubernetesResourceExists(serviceEndpointNameFirst),
-				),
-			}, {
-				Config: testhelper.TestAccServiceEndpointKubernetesResource(projectName, serviceEndpointNameSecond),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "project_id"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "authorizationType"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "azureEnvironment"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "azureTenantId"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "azureSubscriptionId"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "azureSubscriptionName"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "clusterId"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "namespace"),
-					resource.TestCheckResourceAttr(tfSvcEpNode, "service_endpoint_name", serviceEndpointNameSecond),
-					testAccCheckServiceEndpointKubernetesResourceExists(serviceEndpointNameSecond),
-				),
-			},
-		},
-	})
+	var attrTestCheckFuncList []resource.TestCheckFunc
+	attrTestCheckFuncList = append(
+		attrTestCheckFuncList,
+		resource.TestCheckResourceAttrSet(terraformServiceEndpointNode, "azure_subscription.#"),
+	)
+	testAccAzureDevOpsServiceEndpoint(t, attrTestCheckFuncList, authorizationType)
 }
 
 // validates that an apply followed by another apply (i.e., resource update) will be reflected in AzDO and the
 // underlying terraform state.
-func TestAccAzureDevOpsServiceEndpointKubernetesForServiceAccount_CreateAndUpdate(t *testing.T) {
-	projectName := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	serviceEndpointNameFirst := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	serviceEndpointNameSecond := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+func TestAccAzureDevOpsServiceEndpointKubernetesForServiceAccountCreateAndUpdate(t *testing.T) {
+	authorizationType := "ServiceAccount"
 
-	tfSvcEpNode := "azuredevops_serviceendpoint_kubernetes.serviceendpoint"
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testhelper.TestAccPreCheck(t, nil) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccServiceEndpointKubernetesCheckDestroy,
-		Steps: []resource.TestStep{
-			{
-				Config: testhelper.TestAccServiceEndpointKubernetesResource(projectName, serviceEndpointNameFirst),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "project_id"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "authorizationType"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "clusterContext"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "kubeconfig"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "acceptUntrustedCerts"),
-					resource.TestCheckResourceAttr(tfSvcEpNode, "service_endpoint_name", serviceEndpointNameFirst),
-					testAccCheckServiceEndpointKubernetesResourceExists(serviceEndpointNameFirst),
-				),
-			}, {
-				Config: testhelper.TestAccServiceEndpointKubernetesResource(projectName, serviceEndpointNameSecond),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "project_id"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "authorizationType"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "clusterContext"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "kubeconfig"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "acceptUntrustedCerts"),
-					resource.TestCheckResourceAttr(tfSvcEpNode, "service_endpoint_name", serviceEndpointNameSecond),
-					testAccCheckServiceEndpointKubernetesResourceExists(serviceEndpointNameSecond),
-				),
-			},
-		},
-	})
+	var attrTestCheckFuncList []resource.TestCheckFunc
+	attrTestCheckFuncList = append(
+		attrTestCheckFuncList,
+		resource.TestCheckResourceAttrSet(terraformServiceEndpointNode, "service_account.#"),
+	)
+
+	testAccAzureDevOpsServiceEndpoint(t, attrTestCheckFuncList, authorizationType)
 }
 
 // validates that an apply followed by another apply (i.e., resource update) will be reflected in AzDO and the
 // underlying terraform state.
-func TestAccAzureDevOpsServiceEndpointKubernetesForKubeconfig_CreateAndUpdate(t *testing.T) {
+func TestAccAzureDevOpsServiceEndpointKubernetesForKubeconfigCreateAndUpdate(t *testing.T) {
+	authorizationType := "Kubeconfig"
+
+	var attrTestCheckFuncList []resource.TestCheckFunc
+	attrTestCheckFuncList = append(
+		attrTestCheckFuncList,
+		resource.TestCheckResourceAttrSet(terraformServiceEndpointNode, "kubeconfig.#"),
+	)
+	testAccAzureDevOpsServiceEndpoint(t, attrTestCheckFuncList, authorizationType)
+}
+
+func testAccAzureDevOpsServiceEndpoint(t *testing.T, attrTestCheckFuncList []resource.TestCheckFunc, authorizationType string) {
 	projectName := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	serviceEndpointNameFirst := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	serviceEndpointNameSecond := testhelper.TestAccResourcePrefix + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 
-	tfSvcEpNode := "azuredevops_serviceendpoint_kubernetes.serviceendpoint"
+	tfSvcEpNode := terraformServiceEndpointNode
+
+	attrTestCheckFuncList = append(
+		attrTestCheckFuncList,
+		resource.TestCheckResourceAttrSet(terraformServiceEndpointNode, "project_id"),
+		resource.TestCheckResourceAttr(terraformServiceEndpointNode, "authorization_type", authorizationType),
+	)
+	attrTestCheckFuncListNameFirst := append(
+		attrTestCheckFuncList,
+		resource.TestCheckResourceAttr(tfSvcEpNode, "service_endpoint_name", serviceEndpointNameFirst),
+		testAccCheckServiceEndpointKubernetesResourceExists(serviceEndpointNameFirst),
+	)
+
+	attrTestCheckFuncListNameSecond := append(
+		attrTestCheckFuncList,
+		resource.TestCheckResourceAttr(tfSvcEpNode, "service_endpoint_name", serviceEndpointNameSecond),
+		testAccCheckServiceEndpointKubernetesResourceExists(serviceEndpointNameSecond),
+	)
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testhelper.TestAccPreCheck(t, nil) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccServiceEndpointKubernetesCheckDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testhelper.TestAccServiceEndpointKubernetesResource(projectName, serviceEndpointNameFirst),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "project_id"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "authorizationType"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "apiToken"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "serviceAccountCertificate"),
-					resource.TestCheckResourceAttr(tfSvcEpNode, "service_endpoint_name", serviceEndpointNameFirst),
-					testAccCheckServiceEndpointKubernetesResourceExists(serviceEndpointNameFirst),
-				),
+				Config: testhelper.TestAccServiceEndpointKubernetesResource(projectName, serviceEndpointNameFirst, authorizationType),
+				Check:  resource.ComposeTestCheckFunc(attrTestCheckFuncListNameFirst...),
 			}, {
-				Config: testhelper.TestAccServiceEndpointKubernetesResource(projectName, serviceEndpointNameSecond),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "project_id"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "authorizationType"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "clusterContext"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "apiToken"),
-					resource.TestCheckResourceAttrSet(tfSvcEpNode, "serviceAccountCertificate"),
-					resource.TestCheckResourceAttr(tfSvcEpNode, "service_endpoint_name", serviceEndpointNameSecond),
-					testAccCheckServiceEndpointKubernetesResourceExists(serviceEndpointNameSecond),
-				),
+				Config: testhelper.TestAccServiceEndpointKubernetesResource(projectName, serviceEndpointNameSecond, authorizationType),
+				Check:  resource.ComposeTestCheckFunc(attrTestCheckFuncListNameSecond...),
 			},
 		},
 	})
@@ -553,7 +557,7 @@ func TestAccAzureDevOpsServiceEndpointKubernetesForKubeconfig_CreateAndUpdate(t 
 // or not the resource (1) exists in the state and (2) exist in AzDO and (3) has the correct name
 func testAccCheckServiceEndpointKubernetesResourceExists(expectedName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		serviceEndpointDef, ok := s.RootModule().Resources["azuredevops_serviceendpoint_kubernetes.serviceendpoint"]
+		serviceEndpointDef, ok := s.RootModule().Resources[terraformServiceEndpointNode]
 		if !ok {
 			return fmt.Errorf("Did not find a service endpoint in the TF state")
 		}
@@ -600,6 +604,46 @@ func getServiceEndpointKubernetesFromResource(resource *terraform.ResourceState)
 	return clients.ServiceEndpointClient.GetServiceEndpointDetails(clients.Ctx, serviceendpoint.GetServiceEndpointDetailsArgs{
 		Project:    &projectID,
 		EndpointId: &serviceEndpointDefID,
+	})
+}
+
+func configureServiceAccount(d *schema.ResourceData) {
+	d.Set("service_account", &[]map[string]interface{}{
+		{
+			"token":   "kubernetes_TEST_api_token",
+			"ca_cert": "kubernetes_TEST_ca_cert",
+		},
+	})
+}
+
+func configureKubeconfig(d *schema.ResourceData) {
+	d.Set("kubeconfig", &[]map[string]interface{}{
+		{
+			"kube_config": `<<EOT
+							apiVersion: v1
+							clusters:
+							- cluster:
+							certificate-authority: fake-ca-file
+							server: https://1.2.3.4
+							name: development
+							contexts:
+							- context:
+							cluster: development
+							namespace: frontend
+							user: developer
+							name: dev-frontend
+							current-context: dev-frontend
+							kind: Config
+							preferences: {}
+							users:
+							- name: developer
+							user:
+							client-certificate: fake-cert-file
+							client-key: fake-key-file
+							EOT`,
+			"accept_untrusted_certs": true,
+			"cluster_context":        "dev-frontend",
+		},
 	})
 }
 

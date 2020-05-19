@@ -1,26 +1,22 @@
 # azuredevops_resource_authorization
-Manages authorization of resources like access in pipelines.
+Manages authorization of resources, e.g. for access in build pipelines.
 
 Currently supported resources: service endpoint (aka service connection, endpoint).
 
 ## Example Usage
 
 ```hcl
-resource "azuredevops_serviceendpoint_kubernetes" "aks_endpoint" {
-  project_id = "phoenix-project"
-  service_endpoint_name = "kubernetes"
-  apiserver_url = "https://kubernetes-914c6423.hcp.westeurope.azmk8s.io"
-
-  authorization_type = "ServiceAccount"
-  service_account {
-    token = "aSoZ9KkNeH3dF[...]K8bPxc2uQ=="
-    ca_cert = "BXt4WbC5hI[...]mHHRUH14gw4Q=="
-  }
+resource "azuredevops_serviceendpoint_bitbucket" "bitbucket_account" {
+  project_id = "vanilla-sky"
+  username               = "xxxx"
+  password               = "xxxx"
+  service_endpoint_name  = "test-bitbucket"
+  description            = "test"
 }
 
 resource "azuredevops_resource_authorization" "auth" {
   project_id = "phoenix-project"
-  resource_id = azuredevops_serviceendpoint_kubernetes.aks_endpoint.id
+  resource_id = azuredevops_serviceendpoint_bitbucket.bitbucket_account.id
   authorized = true
 }
 ```

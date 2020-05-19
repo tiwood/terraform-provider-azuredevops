@@ -96,64 +96,78 @@ resource "azuredevops_serviceendpoint_azurerm" "endpoint1" {
   azurerm_scope             = "/subscriptions/1da42ac9-xxxx-xxxxx-xxxx-xxxxxxxxxxx"
 }
 
+resource "azuredevops_serviceendpoint_bitbucket" "bitbucket_account" {
+  project_id = "vanilla-sky"
+  username               = "xxxx"
+  password               = "xxxx"
+  service_endpoint_name  = "test-bitbucket"
+  description            = "test"
+}
+
+resource "azuredevops_resource_authorization" "bitbucket_account_authorization" {
+  project_id = azuredevops_project.project.id
+  resource_id = azuredevops_serviceendpoint_bitbucket.bitbucket_account.id
+  authorized = true
+}
+
 resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
-  project_id            = azuredevops_project.project.id
-  service_endpoint_name = "Sample Kubernetes"
-  apiserver_url         = "https://sample-kubernetes-cluster.hcp.westeurope.azmk8s.io"
-  authorization_type    = "AzureSubscription"
+  project_id             = azuredevops_project.project.id
+  service_endpoint_name  = "Sample Kubernetes"
+  apiserver_url          = "https://sample-kubernetes-cluster.hcp.westeurope.azmk8s.io"
+  authorization_type = "AzureSubscription"
 
   azure_subscription {
-    subscription_id   = "8a7aace5-xxxx-xxxx-xxxx-xxxxxxxxxx"
+    subscription_id = "8a7aace5-xxxx-xxxx-xxxx-xxxxxxxxxx"
     subscription_name = "Microsoft Azure DEMO"
-    tenant_id         = "2e3a33f9-66b1-4xxx-xxxx-xxxxxxxxx"
-    resourcegroup_id  = "sample-rg"
-    namespace         = "default"
-    cluster_name      = "sample-aks"
+    tenant_id = "2e3a33f9-66b1-4xxx-xxxx-xxxxxxxxx"
+    resourcegroup_id = "sample-rg"
+    namespace = "default"
+    cluster_name = "sample-aks"
   }
 }
 
 resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
-  project_id            = azuredevops_project.project.id
-  service_endpoint_name = "Sample Kubernetes"
-  apiserver_url         = "https://sample-aks.hcp.westeurope.azmk8s.io"
-  authorization_type    = "Kubeconfig"
+  project_id             = azuredevops_project.project.id
+  service_endpoint_name  = "Sample Kubernetes"
+  apiserver_url          = "https://sample-aks.hcp.westeurope.azmk8s.io"
+  authorization_type = "Kubeconfig"
 
   kubeconfig {
-    kube_config            = <<EOT
-                              apiVersion: v1
-                              clusters:
-                              - cluster:
-                                  certificate-authority: fake-ca-file
-                                  server: https://1.2.3.4
-                                name: development
-                              contexts:
-                              - context:
-                                  cluster: development
-                                  namespace: frontend
-                                  user: developer
-                                name: dev-frontend
-                              current-context: dev-frontend
-                              kind: Config
-                              preferences: {}
-                              users:
-                              - name: developer
-                                user:
-                                  client-certificate: fake-cert-file
-                                  client-key: fake-key-file
-                              EOT
+    kube_config = <<EOT
+                apiVersion: v1
+                clusters:
+                - cluster:
+                    certificate-authority: fake-ca-file
+                    server: https://1.2.3.4
+                  name: development
+                contexts:
+                - context:
+                    cluster: development
+                    namespace: frontend
+                    user: developer
+                  name: dev-frontend
+                current-context: dev-frontend
+                kind: Config
+                preferences: {}
+                users:
+                - name: developer
+                  user:
+                    client-certificate: fake-cert-file
+                    client-key: fake-key-file
+                EOT
     accept_untrusted_certs = true
-    cluster_context        = "dev-frontend"
+    cluster_context = "dev-frontend"
   }
 }
 
 resource "azuredevops_serviceendpoint_kubernetes" "serviceendpoint" {
-  project_id            = azuredevops_project.project.id
-  service_endpoint_name = "Sample Kubernetes"
-  apiserver_url         = "https://sample-kubernetes-cluster.hcp.westeurope.azmk8s.io"
-  authorization_type    = "ServiceAccount"
+  project_id             = azuredevops_project.project.id
+  service_endpoint_name  = "Sample Kubernetes"
+  apiserver_url          = "https://sample-kubernetes-cluster.hcp.westeurope.azmk8s.io"
+  authorization_type = "ServiceAccount"
 
   service_account {
-    token   = "bXktYXBw[...]K8bPxc2uQ=="
+    token = "bXktYXBw[...]K8bPxc2uQ=="
     ca_cert = "Mzk1MjgkdmRnN0pi[...]mHHRUH14gw4Q=="
   }
 }
