@@ -4,15 +4,10 @@
 package acceptancetests
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/terraform"
-	"github.com/microsoft/azure-devops-go-api/azuredevops/core"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/acceptancetests/testutils"
-	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/client"
-	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/utils/converter"
 )
 
 // Verifies that the following sequence of events occurrs without error:
@@ -31,7 +26,7 @@ func TestAccProject_CreateAndUpdate(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testutils.PreCheck(t, nil) },
 		Providers:    testutils.GetProviders(),
-		CheckDestroy: checkProjectDestroyed,
+		CheckDestroy: testutils.CheckProjectDestroyed,
 		Steps: []resource.TestStep{
 			{
 				Config: testutils.HclProjectResource(projectNameFirst),
@@ -41,7 +36,7 @@ func TestAccProject_CreateAndUpdate(t *testing.T) {
 					resource.TestCheckResourceAttr(tfNode, "version_control", "Git"),
 					resource.TestCheckResourceAttr(tfNode, "visibility", "private"),
 					resource.TestCheckResourceAttr(tfNode, "work_item_template", "Agile"),
-					checkProjectExists(projectNameFirst),
+					testutils.CheckProjectExists(projectNameSecond),
 				),
 			},
 			{
@@ -52,7 +47,7 @@ func TestAccProject_CreateAndUpdate(t *testing.T) {
 					resource.TestCheckResourceAttr(tfNode, "version_control", "Git"),
 					resource.TestCheckResourceAttr(tfNode, "visibility", "private"),
 					resource.TestCheckResourceAttr(tfNode, "work_item_template", "Agile"),
-					checkProjectExists(projectNameSecond),
+					testutils.CheckProjectExists(projectNameSecond),
 				),
 			},
 			{
