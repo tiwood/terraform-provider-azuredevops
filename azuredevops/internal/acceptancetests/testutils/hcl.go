@@ -110,6 +110,18 @@ resource "azuredevops_serviceendpoint_github" "serviceendpoint" {
 	return fmt.Sprintf("%s\n%s", projectResource, serviceEndpointResource)
 }
 
+// HclServiceEndpointSonarqubeResource HCL describing an AzDO service endpoint
+func HclServiceEndpointSonarqubeResource(projectName string, serviceEndpointName string) string {
+	serviceEndpointResource := fmt.Sprintf(`
+resource "azuredevops_serviceendpoint_sonarqube" "serviceendpoint" {
+	project_id             = azuredevops_project.project.id
+	service_endpoint_name  = "%s"
+}`, serviceEndpointName)
+
+	projectResource := HclProjectResource(projectName)
+	return fmt.Sprintf("%s\n%s", projectResource, serviceEndpointResource)
+}
+
 // HclServiceEndpointDockerRegistryResource HCL describing an AzDO service endpoint
 func HclServiceEndpointDockerRegistryResource(projectName string, serviceEndpointName string /*, username string, password string*/) string {
 	serviceEndpointResource := fmt.Sprintf(`
